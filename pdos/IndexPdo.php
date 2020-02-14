@@ -1,64 +1,17 @@
 <?php
 
-//READ
-function test()
-{
+////READ
+///
+///
+
+function isValidUser($mail, $pw){
     $pdo = pdoSqlConnect();
-    $query = "SELECT * FROM Test;";
-
-    $st = $pdo->prepare($query);
-    //    $st->execute([$param,$param]);
-    $st->execute();
-    $st->setFetchMode(PDO::FETCH_ASSOC);
-    $res = $st->fetchAll();
-
-    $st = null;
-    $pdo = null;
-
-    return $res;
-}
-
-//READ
-function testDetail($testNo)
-{
-    $pdo = pdoSqlConnect();
-    $query = "SELECT * FROM Test WHERE no = ?;";
-
-    $st = $pdo->prepare($query);
-    $st->execute([$testNo]);
-    //    $st->execute();
-    $st->setFetchMode(PDO::FETCH_ASSOC);
-    $res = $st->fetchAll();
-
-    $st = null;
-    $pdo = null;
-
-    return $res[0];
-}
-
-
-function testPost($name)
-{
-    $pdo = pdoSqlConnect();
-    $query = "INSERT INTO Test (name) VALUES (?);";
-
-    $st = $pdo->prepare($query);
-    $st->execute([$name]);
-
-    $st = null;
-    $pdo = null;
-
-}
-
-
-function isValidUser($id, $pw){
-    $pdo = pdoSqlConnect();
-    $query = "SELECT EXISTS(SELECT * FROM User WHERE userId= ? AND userPw = ?) AS exist;";
+    $query = "SELECT EXISTS(SELECT * FROM User WHERE mail= ? AND pw = ?) AS exist;";
 
 
     $st = $pdo->prepare($query);
     //    $st->execute([$param,$param]);
-    $st->execute([$id, $pw]);
+    $st->execute([$mail, $pw]);
     $st->setFetchMode(PDO::FETCH_ASSOC);
     $res = $st->fetchAll();
 

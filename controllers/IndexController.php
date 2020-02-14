@@ -25,42 +25,11 @@ try {
         /*
          * API No. 0
          * API Name : 테스트 API
-         * 마지막 수정 날짜 : 19.04.29
+         * 마지막 수정 날짜 : 20.02.14
          */
-        case "test":
-            http_response_code(200);
-            $res->result = test();
-            $res->isSuccess = TRUE;
-            $res->code = 100;
-            $res->message = "테스트 성공";
-            echo json_encode($res, JSON_NUMERIC_CHECK);
-            break;
-        /*
-         * API No. 0
-         * API Name : 테스트 Path Variable API
-         * 마지막 수정 날짜 : 19.04.29
-         */
-        case "testDetail":
-            http_response_code(200);
-            $res->result = testDetail($vars["testNo"]);
-            $res->isSuccess = TRUE;
-            $res->code = 100;
-            $res->message = "테스트 성공";
-            echo json_encode($res, JSON_NUMERIC_CHECK);
-            break;
-        /*
-         * API No. 0
-         * API Name : 테스트 Body & Insert API
-         * 마지막 수정 날짜 : 19.04.29
-         */
-        case "testPost":
-            http_response_code(200);
-            $res->result = testPost($req->name);
-            $res->isSuccess = TRUE;
-            $res->code = 100;
-            $res->message = "테스트 성공";
-            echo json_encode($res, JSON_NUMERIC_CHECK);
-            break;
+
+
+
     }
 } catch (\Exception $e) {
     return getSQLErrorException($errorLogs, $e, $req);

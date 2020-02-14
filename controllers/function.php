@@ -28,6 +28,7 @@ function isValidHeader($jwt, $key)
     }
 }
 
+
 function sendFcm($fcmToken, $data, $key, $deviceType)
 {
     $url = 'https://fcm.googleapis.com/fcm/send';
