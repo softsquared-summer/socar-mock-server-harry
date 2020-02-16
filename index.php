@@ -17,11 +17,25 @@ $dispatcher = FastRoute\simpleDispatcher(function (FastRoute\RouteCollector $r) 
     /* ******************   Test   ****************** */
 
 
-    $r->addRoute('GET', '/', ['IndexController', 'index']);
-    $r->addRoute('GET', '/jwt', ['MainController', 'validateJwt']);
+    $r->addRoute('POST', '/user', ['IndexController', 'register']);
     $r->addRoute('POST', '/jwt', ['MainController', 'createJwt']);
-
-    
+    $r->addRoute('GET', '/socarzone', ['IndexController', 'printSocarzone']);
+    $r->addRoute('GET', '/socarzone/{socarzoneNo}', ['IndexController', 'selectSocar']);
+    $r->addRoute('GET', '/insurance/{carModel}', ['IndexController', 'selectInsurance']);
+    $r->addRoute('GET', '/reservation', ['IndexController', 'checkReservationInfo']);
+    $r->addRoute('GET', '/car/{carNo}', ['IndexController', 'checkCarInfo']);
+    $r->addRoute('GET', '/payment', ['IndexController', 'checkPaymentInfo']);
+    $r->addRoute('POST', '/reservation', ['IndexController', 'makeReservation']);
+    $r->addRoute('GET', '/reservation/close', ['IndexController', 'checkCloseReservation']);
+    $r->addRoute('PATCH', '/reservation', ['IndexController', 'changeReservationStatus']);
+    $r->addRoute('GET', '/menu', ['IndexController', 'printMenu']);
+    $r->addRoute('GET', '/setup', ['IndexController', 'printSetup']);
+    $r->addRoute('GET', '/user/id', ['IndexController', 'printId']);
+    $r->addRoute('PATCH', '/user', ['IndexController', 'changeUserInfo']);
+    $r->addRoute('GET', '/reservation/all', ['IndexController', 'printReservationList']);
+    $r->addRoute('GET', '/reservation/{reservationNo}', ['IndexController', 'printReservationInfo']);
+    $r->addRoute('DELETE', '/reservation/{reservationNo}', ['IndexController', 'cancelReservation']);
+    $r->addRoute('GET', '/payment/{reservationNo}', ['IndexController', 'printPaymentInfo']);
 
 
 //    $r->addRoute('GET', '/users', 'get_all_users_handler');
