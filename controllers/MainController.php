@@ -10,7 +10,7 @@ try {
     addAccessLogs($accessLogs, $req);
     switch ($handler) {
         /*
-         * API No. 0
+         * API No. -
          * API Name : JWT 유효성 검사 테스트 API
          * 마지막 수정 날짜 : 19.04.25
          */
@@ -35,24 +35,15 @@ try {
 
             echo json_encode($res, JSON_NUMERIC_CHECK);
             break;
+
         /*
-         * API No. 1
-         * API Name : JWT 생성 테스트 API (로그인)
-         * 마지막 수정 날짜 : 19.04.25
+         * API No. 2
+         * API Name : 로그인 API (JWT 생성 테스트)
+         * 마지막 수정 날짜 : 20.02.17
          */
         case "createJwt":
             // jwt 유효성 검사
             http_response_code(200);
-
-            echo "{
-                    \"result\": {
-                        \"jwt\": \"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyMC0wMS0yOCAxNzo0Mjo1MiIsImlkIjoia2toMDE5NiIsInB3IjoiMTExMTEzIn0.YW9pT0ZLCemROCVjJkorK0g0nF62VOdSNtP_q5fGAtw\"
-                    },
-                    \"isSuccess\": true,
-                    \"code\": 100,
-                    \"message\": \"테스트 성공\"
-                }";
-            break;
 
 //            if(!isValidUser($req->mail, $req->pw)){
 //                $res->isSuccess = FALSE;
@@ -64,11 +55,12 @@ try {
 //
 //            //페이로드에 맞게 다시 설정 요함
 //            $jwt = getJWToken($req->mail, $req->pw, JWT_SECRET_KEY);
-//            $res->result->jwt = $jwt;
-//            $res->isSuccess = TRUE;
-//            $res->code = 100;
-//            $res->message = "테스트 성공";
-//            echo json_encode($res, JSON_NUMERIC_CHECK);
+            $jwt = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyMC0wMS0yOCAxNzo0Mjo1MiIsImlkIjoia2toMDE5NiIsInB3IjoiMTExMTEzIn0.YW9pT0ZLCemROCVjJkorK0g0nF62VOdSNtP_q5fGAtw";
+            $res->result->jwt = $jwt;
+            $res->isSuccess = TRUE;
+            $res->code = 100;
+            $res->message = "테스트 성공";
+            echo json_encode($res, JSON_NUMERIC_CHECK);
             break;
 
     }

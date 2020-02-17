@@ -16,7 +16,7 @@ ini_set('default_charset', 'utf8mb4');
 $dispatcher = FastRoute\simpleDispatcher(function (FastRoute\RouteCollector $r) {
     /* ******************   Test   ****************** */
 
-
+    $r->addRoute('GET', '/', ['IndexController', 'index']);
     $r->addRoute('POST', '/user', ['IndexController', 'register']);
     $r->addRoute('POST', '/jwt', ['MainController', 'createJwt']);
     $r->addRoute('GET', '/socarzone', ['IndexController', 'printSocarzone']);
