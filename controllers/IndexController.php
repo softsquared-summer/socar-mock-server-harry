@@ -10,7 +10,7 @@ try {
     addAccessLogs($accessLogs, $req);
     switch ($handler) {
         case "index":
-            echo "API Server";
+            echo "test API Server";
             break;
         case "ACCESS_LOGS":
             //            header('content-type text/html charset=utf-8');
@@ -22,13 +22,204 @@ try {
             header('Content-Type: text/html; charset=UTF-8');
             getLogs("./logs/errors.log");
             break;
+        /*
+         * API No. 0
+         * API Name : 테스트 API
+         * 마지막 수정 날짜 : 20.02.17
+         */
+        case "test":
+            http_response_code(200);
+
+
+
+            $test = geocode();
+            echo $test;
+
+            $res->isSuccess = TRUE;
+            $res->code = 100;
+            $res->message = "테스트 성공";
+            echo json_encode($res, JSON_NUMERIC_CHECK);
+            break;
+
+
+
+
+
+
+
 
         /*
          * API No. 1
          * API Name : 회원가입 API
-         * 마지막 수정 날짜 : 20.02.17
+         * 마지막 수정 날짜 : 20.02.19
          */
         case "register":
+            if($req->ToSAgreementOne!='Y' | $req->ToSAgreementTwo!='Y' | $req->ToSAgreementThree!='Y' | $req->ToSAgreementFour!='Y'){
+                $res->isSuccess = FALSE;
+                $res->code = 209;
+                $res->message = "결제서비스 이용약관에 모두 동의해야 합니다.";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            }
+            if($req->licenseAgreement!='Y'){
+                $res->isSuccess = FALSE;
+                $res->code = 212;
+                $res->message = "운전면허 고유식별정보 수집 및 이용에 동의해야 합니다.";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            }
+
+            $checkName = preg_match("/^[가-힣]{4,12}$|^[a-zA-Z]{2,10}$/", $req->name);
+            if ($checkName == false) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "이름은 한글2~4자, 영문 2~10자로 입력해야 합니다.";
+                echo json_encode($res);
+                return;
+            }
+
+            $checkBirth = preg_match("/^(?:[0-9]{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[1,2][0-9]|3[0,1]))$/", $req->residentNo);
+            $checkGender = preg_match("/^[1-4]$/", $req->gender);
+            if ($checkBirth == false | $checkGender==false) {
+                $res->isSuccess = FALSE;
+                $res->code = 202;
+                $res->message = "주민번호가 올바르지 않습니다.";
+                echo json_encode($res);
+                return;
+            }
+
+            $checkPhoneNo=preg_match("/^(010|011|016|017|018|019)-?\d{3,4}-?\d{4}$/u", $req->phoneNo);
+            if($checkPhoneNo==false) {
+                $res->isSuccess = FALSE;
+                $res->code = 203;
+                $res->message = "전화번호가 올바르지 않습니다";
+                echo json_encode($res);
+                return;
+            }
+
+            $checkId = preg_match("/^[_\.0-9a-zA-Z-]+@([0-9a-zA-Z][0-9a-zA-Z-]+\.)+[a-zA-Z]{2,6}$/i", $req->id);
+            if ($checkId == false) {
+                $res->isSuccess = FALSE;
+                $res->code = 204;
+                $res->message = "아이디(이메일) 형식이 올바르지 않습니다.";
+                echo json_encode($res);
+                return;
+            }
+
+            $checkPw = preg_match("/^(?=.*[a-z])(?=.*[0-9])(?=.*[!@#$%^*()\-_=+\\\|\[\]{};:\'\",.<>\/?])*.{8,45}$/i", $req->pw);
+            if ($checkPw == false) {
+                $res->isSuccess = FALSE;
+                $res->code = 205;
+                $res->message = "비밀번호는 영문, 숫자 포함 8자리 이상 입력해야 합니다.";
+                echo json_encode($res);
+                return;
+            }
+
+            $checkCardNo = preg_match("/^[0-9]{16}$/", $req->cardNo);
+            if ($checkCardNo==false) {
+                $res->isSuccess = FALSE;
+                $res->code = 207;
+                $res->message = "카드 번호가 올바르지 않습니다.";
+                echo json_encode($res);
+                return;
+            }
+
+            $checkCardDate = preg_match("/^((?:0[1-9]|1[0-2])\/(?:[0-9]{2}))$/", $req->cardDate);
+            if (date("y") > substr($req->cardDate, 3, 2) ){
+                $checkCardDate = false;
+            } else if ( date("y") == substr($req->cardDate, 3, 2) & date("m") > substr($req->cardDate, 0, 2) ){
+                $checkCardDate = false;
+            }
+            if ($checkCardDate == false) {
+                $res->isSuccess = FALSE;
+                $res->code = 208;
+                $res->message = "카드유효 기간이 올바르지 않습니다.";
+                echo json_encode($res);
+                return;
+            }
+
+            if($req->licenseType!='1종보통' & $req->licenseType!='2종보통'){
+                $res->isSuccess = FALSE;
+                $res->code = 210;
+                $res->message = "면허종류가 올바르지 않습니다.";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            }
+
+            if($req->licenseRegion!='서울' & $req->licenseRegion!='부산' & $req->licenseRegion!='경기' & $req->licenseRegion!='강원' & $req->licenseRegion!='충북' & $req->licenseRegion!='충남'
+                & $req->licenseRegion!='전북' & $req->licenseRegion!='전남' & $req->licenseRegion!='경북' & $req->licenseRegion!='경남' & $req->licenseRegion!='제주' & $req->licenseRegion!='대구'
+                & $req->licenseRegion!='광주' & $req->licenseRegion!='대전' & $req->licenseRegion!='울산'){
+                $res->isSuccess = FALSE;
+                $res->code = 210;
+                $res->message = "면허지역이 올바르지 않습니다.";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            }
+
+            $checkLicenseNo=preg_match("/^\d{2}-\d{6}-\d{2}$/", $req->licenseNo);
+            if($checkLicenseNo==false) {
+                $res->isSuccess = FALSE;
+                $res->code = 210;
+                $res->message = "면허번호가 올바르지 않습니다";
+                echo json_encode($res);
+                return;
+            }
+
+            $checkLicenseDate = preg_match("/^(19|20)(?:[0-9]{2}\/(?:0[1-9]|1[0-2])\/(?:0[1-9]|[1,2][0-9]|3[0,1]))$/", $req->licenseDate);
+            $checkLicenseExpiryDate = preg_match("/^(19|20)(?:[0-9]{2}\/(?:0[1-9]|1[0-2])\/(?:0[1-9]|[1,2][0-9]|3[0,1]))$/", $req->licenseExpiryDate);
+            $licenseDateYear = substr($req->licenseDate, 0, 4);
+            $licenseDateMonth = substr($req->licenseDate, 5, 2);
+            $licenseDateDay = substr($req->licenseDate, 8, 2);
+            $licenseExpiryDateYear = substr($req->licenseExpiryDate, 0, 4);
+            $licenseExpiryDateMonth = substr($req->licenseExpiryDate, 5, 2);
+            $licenseExpiryDateDay = substr($req->licenseExpiryDate, 8, 2);
+
+            if ( $licenseDateYear > $licenseExpiryDateYear ){
+                $checkLicenseExpiryDate = false;
+            } else if ( $licenseDateYear == $licenseExpiryDateYear &  $licenseDateMonth > $licenseExpiryDateMonth){
+                $checkLicenseExpiryDate = false;
+            } else if ( $licenseDateYear == $licenseExpiryDateYear &  $licenseDateMonth == $licenseExpiryDateMonth & $licenseDateDay > $licenseExpiryDateDay){
+                $checkLicenseExpiryDate = false;
+            }
+            if (date("yy") > $licenseExpiryDateYear ){
+                $checkLicenseExpiryDate = false;
+            } else if ( date("yy") == $licenseExpiryDateYear & date("m") > $licenseExpiryDateMonth ){
+                $checkLicenseExpiryDate = false;
+            } else if ( date("yy") == $licenseExpiryDateYear & date("m") == $licenseExpiryDateMonth & date("d") > $licenseExpiryDateDay ){
+                $checkLicenseExpiryDate = false;
+            }
+            if ($checkLicenseDate == false | $checkLicenseExpiryDate == false) {
+                $res->isSuccess = FALSE;
+                $res->code = 211;
+                $res->message = "적성검사 기간이 올바르지 않습니다.";
+                echo json_encode($res);
+                return;
+            }
+
+            $checkId = checkId($req->id);
+            if ($checkId != null) {
+                $res->isSuccess = FALSE;
+                $res->code = 213;
+                $res->message = "이미 존재하는 아이디입니다.";
+                echo json_encode($res);
+                return;
+            }
+            if($req->inviteCode!=null){
+                $checkInviteCode = checkId($req->inviteCode);
+                if ($checkInviteCode == null) {
+                    $res->isSuccess = FALSE;
+                    $res->code = 202;
+                    $res->message = "존재하지 않는 추천인 아이디입니다.";
+                    echo json_encode($res);
+                    return;
+                }
+            }
+
+            //나중에 트랜잭션 다시 시도
+            registerAccount($req->name, $req->residentNo, $req->gender, $req->phoneNo, $req->id, $req->pw,
+                $req->cardNo, $req->cardDate, $req->ToSAgreementOne, $req->ToSAgreementTwo, $req->ToSAgreementThree, $req->ToSAgreementFour,
+                $req->licenseType, $req->licenseRegion, $req->licenseNo, $req->licenseExpiryDate, $req->licenseDate, $req->licenseAgreement);
+
             $res->isSuccess = TRUE;
             $res->code = 100;
             $res->message = "회원 가입 성공";
@@ -38,19 +229,70 @@ try {
         /*
          * API No. 3
          * API Name : 쏘카존 출력 API
-         * 마지막 수정 날짜 : 20.02.17
+         * 마지막 수정 날짜 : 20.02.20
          */
         case "printSocarzone":
 
-            $res->result->useTime = "오늘 18:10 - 22:10";
-            $res->result->socarzone[0]->socarzoneNo = 1;
-            $res->result->socarzone[0]->carCount = 3;
-            $res->result->socarzone[0]->latitude = 36.6276675;
-            $res->result->socarzone[0]->longitude = 127.455393899999;
-            $res->result->socarzone[1]->socarzoneNo = 2;
-            $res->result->socarzone[1]->carCount = 0;
-            $res->result->socarzone[1]->latitude = 36.6276675;
-            $res->result->socarzone[1]->longitude = 127.455393899999;
+            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
+            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "유효하지 않은 토큰입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
+
+            $reservationDay= "오늘 ";
+            if ( 0<=date("i") & date("i")<10){
+                $reservationStartTime= strtotime((date("H")).":20");
+                $reservationEndTime= strtotime((date("H")).":50");
+            } else  if ( 10<=date("i") & date("i")<20){
+                $reservationStartTime= strtotime((date("H")).":30");
+                if( date("H")==23 ){
+                    $reservationEndTime= strtotime((date("H")+1).":00 +1 day");
+                } else {
+                    $reservationEndTime= strtotime((date("H")+1).":00");
+                }
+            } else  if ( 20<=date("i") & date("i")<30){
+                $reservationStartTime= strtotime((date("H")).":40");
+                if( date("H")==23 ){
+                    $reservationEndTime= strtotime((date("H")+1).":10 +1 day");
+                } else {
+                    $reservationEndTime= strtotime((date("H")+1).":10");
+                }
+            } else  if ( 30<=date("i") & date("i")<40){
+                $reservationStartTime= strtotime((date("H")).":50");
+                if( date("H")==23 ) {
+                    $reservationEndTime = strtotime((date("H") + 1) . ":20 +1 day");
+                } else {
+                    $reservationEndTime = strtotime((date("H") + 1) . ":20");
+                }
+            } else  if ( 40<=date("i") & date("i")<50){
+                if( date("H")==23 ){
+                    $reservationDay= "내일 ";
+                    $reservationStartTime= strtotime((date("H")+1).":00 +1 day");
+                    $reservationEndTime= strtotime((date("H")+1).":30 +1 day");
+                } else {
+                    $reservationStartTime= strtotime((date("H")+1).":00");
+                    $reservationEndTime= strtotime((date("H")+1).":30");
+                }
+            } else  if ( 50<=date("i") & date("i")<60){
+                if( date("H")==23 ){
+                    $reservationDay= "내일 ";
+                    $reservationStartTime = strtotime((date("H") + 1) . ":10 +1 day");
+                    $reservationEndTime = strtotime((date("H") + 1) . ":40 +1 day");
+                } else {
+                    $reservationStartTime = strtotime((date("H") + 1) . ":10");
+                    $reservationEndTime = strtotime((date("H") + 1) . ":40");
+                }
+            }
+            $useTime = $reservationDay.date("H:i", $reservationStartTime)." - ".date("H:i", $reservationEndTime);
+            $res->result->useTime= $useTime;
+
+            $res->result->socarzone = printSocarzone();
+            //START,ENDTIME 시간 앞에 공백 자르고 인자값 전달
+            //본인 동시예약 확인
 
             $res->isSuccess = TRUE;
             $res->code = 100;
@@ -70,16 +312,18 @@ try {
             $res->result->useTime = 30;
             $res->result->startTime=20200215181000;
             $res->result->endTime=20200215221000;
-            $res->result->availableCar[0]->carNo =1;
-            $res->result->availableCar[0]->profileUrl =null;
-            $res->result->availableCar[0]->model="투싼";
-            $res->result->availableCar[0]->cost =3680;
-            $res->result->availableCar[0]->schedule[0]->otherStartTime ="20200215131000";
-            $res->result->availableCar[0]->schedule[0]->otherEndTime ="20200215151000";
-            $res->result->availableCar[1]->carNo =2;
-            $res->result->availableCar[1]->profileUrl =null;
-            $res->result->availableCar[1]->model="모닝";
-            $res->result->availableCar[1]->cost =1680;
+            $res->result->carList[0]->carNo =1;
+            $res->result->carList[0]->available ="Y";
+            $res->result->carList[0]->profileUrl =null;
+            $res->result->carList[0]->model="투싼";
+            $res->result->carList[0]->cost =3680;
+            $res->result->carList[0]->schedule[0]->otherStartTime ="20200215131000";
+            $res->result->carList[0]->schedule[0]->otherEndTime ="20200215151000";
+            $res->result->carList[1]->carNo =2;
+            $res->result->carList[1]->available ="Y";
+            $res->result->carList[1]->profileUrl =null;
+            $res->result->carList[1]->model="모닝";
+            $res->result->carList[1]->cost =1680;
 
             $res->isSuccess = TRUE;
             $res->code = 100;
@@ -406,7 +650,6 @@ try {
             $res->message = "조회 성공";
             echo json_encode($res, JSON_NUMERIC_CHECK);
             break;
-
 
 
     }

@@ -111,4 +111,5 @@ images/
 # End of https://www.gitignore.io/api/phpstorm,composer
 
 /pdos/DatabasePdo.php
+/controllers/function.php
 >>>>>>> 4a57aa1134d67a04b55bfd38ac915dc56d0f3f2f
