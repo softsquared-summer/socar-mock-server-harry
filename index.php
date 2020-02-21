@@ -21,7 +21,7 @@ $dispatcher = FastRoute\simpleDispatcher(function (FastRoute\RouteCollector $r) 
     $r->addRoute('POST', '/jwt', ['MainController', 'createJwt']);
     $r->addRoute('GET', '/socarzone', ['IndexController', 'printSocarzone']);
     $r->addRoute('GET', '/socarzone/{socarzoneNo}', ['IndexController', 'selectSocar']);
-    $r->addRoute('GET', '/insurance/{carModel}', ['IndexController', 'selectInsurance']);
+    $r->addRoute('GET', '/insurance', ['IndexController', 'selectInsurance']);
     $r->addRoute('GET', '/reservation', ['IndexController', 'checkReservationInfo']);
     $r->addRoute('GET', '/car/{carNo}', ['IndexController', 'checkCarInfo']);
     $r->addRoute('GET', '/payment', ['IndexController', 'checkPaymentInfo']);

@@ -30,8 +30,6 @@ try {
         case "test":
             http_response_code(200);
 
-
-
             $test = geocode();
             echo $test;
 
@@ -40,12 +38,6 @@ try {
             $res->message = "테스트 성공";
             echo json_encode($res, JSON_NUMERIC_CHECK);
             break;
-
-
-
-
-
-
 
 
         /*
@@ -229,11 +221,15 @@ try {
         /*
          * API No. 3
          * API Name : 쏘카존 출력 API
-         * 마지막 수정 날짜 : 20.02.20
+         * 마지막 수정 날짜 : 20.02.21
          */
         case "printSocarzone":
 
             $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
+            $model = $_GET["model"];
+            $startTime = $_GET["startTime"];
+            $endTime = $_GET["endTime"];
+
             if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
                 $res->isSuccess = FALSE;
                 $res->code = 201;
@@ -287,12 +283,36 @@ try {
                     $reservationEndTime = strtotime((date("H") + 1) . ":40");
                 }
             }
+
+
+            $checkStartTime = preg_match("/^(?:[0-9]{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[1,2][0-9]|3[0,1])\s(?:[0-1][0-9]|2[0-3])\:([0-5]0))$/", $startTime);
+            $checkEndTime = preg_match("/^(?:[0-9]{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[1,2][0-9]|3[0,1])(\s?)(?:[0-1][0-9]|2[0-3])\:([0-5]0))$/", $endTime);
+            $afterThirtyFromStart = date("y-m-d H:i", strtotime($startTime."+30 minute"));
+
+            if($startTime!=null & $endTime!=null & $checkStartTime==true & $checkEndTime==true & date("y-m-d H:i") < $afterThirtyFromStart & $afterThirtyFromStart <= date("y-m-d H:i", strtotime($endTime))  ){
+                $reservationStartTime = strtotime($startTime);
+                $reservationEndTime = strtotime($endTime);
+            }
+
+            $data = getDataByJWToken($jwt, JWT_SECRET_KEY);
+            if( checkReservation($data->id, date("Y-m-d H:i:s", $reservationStartTime), date("Y-m-d H:i:s", $reservationEndTime)) ){
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "이미 예약한 시간대입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            }
+
             $useTime = $reservationDay.date("H:i", $reservationStartTime)." - ".date("H:i", $reservationEndTime);
             $res->result->useTime= $useTime;
 
-            $res->result->socarzone = printSocarzone();
-            //START,ENDTIME 시간 앞에 공백 자르고 인자값 전달
-            //본인 동시예약 확인
+            if($model != null){
+                $carModelString = '\''.implode('\',\'', $model).'\'';
+                $res->result->socarzone = printSocarzoneByModel(date("Y-m-d H:i:s", $reservationStartTime), date("Y-m-d H:i:s", $reservationEndTime), $carModelString);
+            } else {
+                echo isnull;
+                $res->result->socarzone = printSocarzone(date("Y-m-d H:i:s", $reservationStartTime), date("Y-m-d H:i:s", $reservationEndTime));
+            }
 
             $res->isSuccess = TRUE;
             $res->code = 100;
@@ -335,13 +355,36 @@ try {
         /*
          * API No. 5
          * API Name : 보험 선택 API
-         * 마지막 수정 날짜 : 20.02.17
+         * 마지막 수정 날짜 : 20.02.21
          */
         case "selectInsurance":
 
-            $res->result->specialCost="8,410원";
-            $res->result->standardCost="5,410원";
-            $res->result->lightCost="3,790원";
+            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
+            $model = $_GET["model"];
+            $startTime = $_GET["startTime"];
+            $endTime = $_GET["endTime"];
+
+            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "유효하지 않은 토큰입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
+
+            $checkStartTime = preg_match("/^(?:[0-9]{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[1,2][0-9]|3[0,1])\s(?:[0-1][0-9]|2[0-3])\:([0-5]0))$/", $startTime);
+            $checkEndTime = preg_match("/^(?:[0-9]{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[1,2][0-9]|3[0,1])(\s?)(?:[0-1][0-9]|2[0-3])\:([0-5]0))$/", $endTime);
+            if( $checkStartTime!=true | $checkEndTime!=true){
+                $res->isSuccess = FALSE;
+                $res->code = 200;
+                $res->message = "조회 실패-기간이 올바르게 입력되지 않았습니다.";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                break;
+            }
+
+            $insuranceTime= ceil((strtotime($endTime)-strtotime($startTime))/3600);
+            $res->result = selectInsurance($model, $insuranceTime);
 
             $res->isSuccess = TRUE;
             $res->code = 100;

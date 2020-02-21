@@ -42,19 +42,41 @@ function registerAccount($name, $residentNo, $gender, $phoneNo, $id, $pw,
     $pdo = null;
 }
 
-function printSocarzone()
+
+function printSocarzone($reservationStartTime, $reservationEndTime)
 {
     $pdo = pdoSqlConnect();
     $query = "SELECT Socarzone.no socarzoneNo, count(Car.no) carCount, Socarzone.latitude, Socarzone.longitude FROM Car
-                LEFT JOIN (SELECT no, carNo from Reservation
-                WHERE (startTime < '2020-02-20 21:50:00' AND '2020-02-20 21:50:00' < endTime) OR ('2020-02-20 21:50:00' < startTime AND startTime < '2020-02-20 22:20:00' )) b
+                LEFT JOIN (SELECT no, carNo, status from Reservation WHERE status != 'canceled' AND
+                          (startTime < ? AND ? < endTime) OR ( ? < startTime AND startTime <  ? )) b
                 ON Car.no=b.carNo
-                
                 JOIN (SELECT no, latitude, longitude FROM Socarzone) Socarzone ON Socarzone.no=Car.socarzoneNo
                 WHERE b.carNo IS NULL GROUP BY Socarzone.no;";
 
     $st = $pdo->prepare($query);
-    $st->execute([]);
+    $st->execute([$reservationStartTime,$reservationStartTime, $reservationStartTime, $reservationEndTime]);
+    $st->setFetchMode(PDO::FETCH_ASSOC);
+    $res = $st->fetchAll();
+
+    $st = null;
+    $pdo = null;
+
+    return $res;
+}
+
+function printSocarzoneByModel($reservationStartTime, $reservationEndTime, $carModel)
+{
+    $pdo = pdoSqlConnect();
+    $query = "SELECT Socarzone.no socarzoneNo, count(Car.no) carCount, Socarzone.latitude, Socarzone.longitude FROM Car
+                LEFT JOIN (SELECT no, carNo, status from Reservation WHERE status != 'canceled' AND
+                          (startTime < ? AND ? < endTime) OR ( ? < startTime AND startTime <  ? )) b
+                ON Car.no=b.carNo
+                JOIN (SELECT no, latitude, longitude FROM Socarzone) Socarzone ON Socarzone.no=Car.socarzoneNo
+                JOIN (SELECT no, model from CarModel) CarModel ON CarModel.no=Car.modelNo
+                WHERE b.carNo IS NULL AND CarModel.model IN ( $carModel ) GROUP BY Socarzone.no;";
+
+    $st = $pdo->prepare($query);
+    $st->execute([$reservationStartTime,$reservationStartTime, $reservationStartTime, $reservationEndTime]);
     $st->setFetchMode(PDO::FETCH_ASSOC);
     $res = $st->fetchAll();
 
@@ -65,12 +87,51 @@ function printSocarzone()
 }
 
 
+function selectInsurance($model, $insuranceTime)
+{
+    $pdo = pdoSqlConnect();
+    $query = "select concat(format(specialCharge*?,0),'원') specialCost, concat(format(standardCharge*?,0),'원') standardCost, concat(format(lightCharge*?,0),'원') lightCost from Insurance
+                join (select no, model from CarModel) CarModel on CarModel.no=Insurance.carModelNo where CarModel.model=?;";
+
+    $st = $pdo->prepare($query);
+    $st->execute([$insuranceTime, $insuranceTime, $insuranceTime, $model]);
+    $st->setFetchMode(PDO::FETCH_ASSOC);
+    $res = $st->fetchAll();
+
+    $st = null;
+    $pdo = null;
+
+    return $res[0];
+}
 
 
 
 
 
 
+
+
+
+
+
+
+
+function checkReservation($id, $reservationStartTime, $reservationEndTime){
+    $pdo = pdoSqlConnect();
+    $query = "SELECT EXISTS(select * from Reservation join (select no, id from User) User on User.no=Reservation.userNo where User.id=?
+                and (startTime < ? AND ? < endTime) OR ( ? < startTime AND startTime < ?)) as exist;";
+
+    $st = $pdo->prepare($query);
+    //    $st->execute([$param,$param]);
+    $st->execute([$id, $reservationStartTime, $reservationStartTime, $reservationStartTime, $reservationEndTime]);
+    $st->setFetchMode(PDO::FETCH_ASSOC);
+    $res = $st->fetchAll();
+
+    $st=null;$pdo = null;
+
+    return intval($res[0]["exist"]);
+
+}
 
 
 function isValidUser($id, $pw){
