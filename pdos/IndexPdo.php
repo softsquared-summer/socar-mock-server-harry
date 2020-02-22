@@ -86,6 +86,22 @@ function printSocarzoneByModel($reservationStartTime, $reservationEndTime, $carM
     return $res;
 }
 
+function checkReservation($id, $reservationStartTime, $reservationEndTime){
+    $pdo = pdoSqlConnect();
+    $query = "SELECT EXISTS(select * from Reservation join (select no, id from User) User on User.no=Reservation.userNo where User.id=?
+                and (startTime < ? AND ? < endTime) OR ( ? < startTime AND startTime < ?)) as exist;";
+
+    $st = $pdo->prepare($query);
+    //    $st->execute([$param,$param]);
+    $st->execute([$id, $reservationStartTime, $reservationStartTime, $reservationStartTime, $reservationEndTime]);
+    $st->setFetchMode(PDO::FETCH_ASSOC);
+    $res = $st->fetchAll();
+
+    $st=null;$pdo = null;
+
+    return intval($res[0]["exist"]);
+
+}
 
 function selectInsurance($model, $insuranceTime)
 {
@@ -95,6 +111,26 @@ function selectInsurance($model, $insuranceTime)
 
     $st = $pdo->prepare($query);
     $st->execute([$insuranceTime, $insuranceTime, $insuranceTime, $model]);
+    $st->setFetchMode(PDO::FETCH_ASSOC);
+    $res = $st->fetchAll();
+
+    $st = null;
+    $pdo = null;
+
+    return $res[0];
+}
+
+function checkCarInfo($carNo)
+{
+    $pdo = pdoSqlConnect();
+    $query = "select Car.no carNo, profileUrl, model, manufacture, sizeType type, fuelType, shiftType, ridingLimit, safetyOption, convenienceOption, concat(format(weekendCharge/10,0),'(30분)') basicCharge,
+        concat(distanceThreeCharge, '~', distanceOneCharge, '원/km') distanceCharge from CarModel
+    join (select no, modelNo from Car) Car on Car.modelNo=CarModel.no
+    join (select carModelNo, weekendCharge, distanceOneCharge, distanceThreeCharge from Charge) Charge on Charge.carModelNo=CarModel.no
+    where Car.no=?;";
+
+    $st = $pdo->prepare($query);
+    $st->execute([$carNo]);
     $st->setFetchMode(PDO::FETCH_ASSOC);
     $res = $st->fetchAll();
 
@@ -114,24 +150,6 @@ function selectInsurance($model, $insuranceTime)
 
 
 
-
-
-function checkReservation($id, $reservationStartTime, $reservationEndTime){
-    $pdo = pdoSqlConnect();
-    $query = "SELECT EXISTS(select * from Reservation join (select no, id from User) User on User.no=Reservation.userNo where User.id=?
-                and (startTime < ? AND ? < endTime) OR ( ? < startTime AND startTime < ?)) as exist;";
-
-    $st = $pdo->prepare($query);
-    //    $st->execute([$param,$param]);
-    $st->execute([$id, $reservationStartTime, $reservationStartTime, $reservationStartTime, $reservationEndTime]);
-    $st->setFetchMode(PDO::FETCH_ASSOC);
-    $res = $st->fetchAll();
-
-    $st=null;$pdo = null;
-
-    return intval($res[0]["exist"]);
-
-}
 
 
 function isValidUser($id, $pw){

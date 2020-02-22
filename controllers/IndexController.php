@@ -396,9 +396,32 @@ try {
         /*
          * API No. 6
          * API Name : 대여 정보 확인 API
-         * 마지막 수정 날짜 : 20.02.17
+         * 마지막 수정 날짜 : 20.02.22
          */
         case "checkReservationInfo":
+
+            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
+
+            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "유효하지 않은 토큰입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
+            $startTime = $_GET["startTime"];
+            $endTime = $_GET["endTime"];
+            $carNo= $_GET["model"];
+            $insurance= $_GET["insurance"];
+
+
+//            시간 가공, useTime은 sql밖에서 따로 집어넣기?
+//            $res->result = checkReservationInfo($startTime, $endTime, $carNo, $insurance);
+//            $res->result['safetyOption']= explode(',', $res->result['safetyOption']);
+//            $res->result['convenienceOption']= explode(',', $res->result['convenienceOption']);
+//            결과값 체크
+
 
             $res->result->carNo =1;
             $res->result->model = "올뉴모닝";
@@ -429,26 +452,24 @@ try {
         /*
          * API No. 7
          * API Name : 차량 정보 확인 API
-         * 마지막 수정 날짜 : 20.02.17
+         * 마지막 수정 날짜 : 20.02.22
          */
         case "checkCarInfo":
 
-            $res->result->carNo =1;
-            $res->result->profileUrl= null;
-            $res->result->model = "아반떼AD";
-            $res->result->manufacture="현대자동차";
-            $res->result->type="준중형";
-            $res->result->fuelType= "휘발유";
-            $res->result->shiftType="자동 6단";
-            $res->result->ridingLimit= 5;
-            $res->result->safetyOption[0]="에어백";
-            $res->result->safetyOption[1]="후방감지센서";
-            $res->result->safetyOption[2]="블랙박스";
-            $res->result->safetyOption[3]="네비게이션";
-            $res->result->convenienceOption[0]="에어컨";
-            $res->result->convenienceOption[1]="열선시트";
-            $res->result->totalCharge="4,750원(30분";
-            $res->result->distanceCharge="190~140원/km";
+            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
+
+            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "유효하지 않은 토큰입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
+
+            $res->result = checkCarInfo($vars["carNo"]);
+            $res->result['safetyOption']= explode(',', $res->result['safetyOption']);
+            $res->result['convenienceOption']= explode(',', $res->result['convenienceOption']);
 
             $res->isSuccess = TRUE;
             $res->code = 100;
