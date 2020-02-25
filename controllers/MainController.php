@@ -45,7 +45,13 @@ try {
             // jwt 유효성 검사
             http_response_code(200);
 
-            if(!isValidUser($req->id, $req->pw)){
+            $pullEncPw= pullEncPw($req->id);
+            IF( password_verify($req->pw, $pullEncPw['encryptedPw'])){
+                $isValidUser=true;
+            }
+
+            if(!$isValidUser){
+//            if(!isValidUser($req->id, $req->pw)){
                 $res->isSuccess = FALSE;
                 $res->code = 201;
                 $res->message = "유효하지 않은 아이디 입니다";
@@ -54,7 +60,7 @@ try {
             }
 
             //페이로드에 맞게 다시 설정 요함
-            $jwt = getJWToken($req->id, $req->pw, JWT_SECRET_KEY);
+            $jwt = getJWToken($req->id, $pullEncPw['encryptedPw'], JWT_SECRET_KEY);
             $res->result->jwt = $jwt;
             $res->isSuccess = TRUE;
             $res->code = 100;

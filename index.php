@@ -17,16 +17,18 @@ $dispatcher = FastRoute\simpleDispatcher(function (FastRoute\RouteCollector $r) 
     /* ******************   Test   ****************** */
 
     $r->addRoute('GET', '/', ['IndexController', 'index']);
+    $r->addRoute('GET', '/test', ['IndexController', 'test']);
+
     $r->addRoute('POST', '/user', ['IndexController', 'register']);
     $r->addRoute('POST', '/jwt', ['MainController', 'createJwt']);
-    $r->addRoute('GET', '/socarzone', ['IndexController', 'printSocarzone']);
-    $r->addRoute('GET', '/socarzone/{socarzoneNo}', ['IndexController', 'selectSocar']);
-    $r->addRoute('GET', '/insurance', ['IndexController', 'selectInsurance']);
-    $r->addRoute('GET', '/reservation', ['IndexController', 'checkReservationInfo']);
+    $r->addRoute('GET', '/socarzones', ['IndexController', 'printSocarzone']);
+    $r->addRoute('GET', '/socarzone/{socarzoneNo}/cars', ['IndexController', 'selectSocar']);
+    $r->addRoute('GET', '/car/{carNo}/insurances', ['IndexController', 'selectInsurance']);
+    //$r->addRoute('GET', '/reservation', ['IndexController', 'checkReservationInfo']);
     $r->addRoute('GET', '/car/{carNo}', ['IndexController', 'checkCarInfo']);
-    $r->addRoute('GET', '/payment', ['IndexController', 'checkPaymentInfo']);
+    $r->addRoute('GET', '/calculation', ['IndexController', 'checkPaymentInfo']);
     $r->addRoute('POST', '/reservation', ['IndexController', 'makeReservation']);
-    $r->addRoute('GET', '/reservation/close', ['IndexController', 'checkCloseReservation']);
+    $r->addRoute('GET', '/reservation/recent', ['IndexController', 'checkCloseReservation']);
     $r->addRoute('PATCH', '/reservation', ['IndexController', 'changeReservationStatus']);
     $r->addRoute('GET', '/menu', ['IndexController', 'printMenu']);
     $r->addRoute('GET', '/setup', ['IndexController', 'printSetup']);
@@ -35,7 +37,8 @@ $dispatcher = FastRoute\simpleDispatcher(function (FastRoute\RouteCollector $r) 
     $r->addRoute('GET', '/reservation/all', ['IndexController', 'printReservationList']);
     $r->addRoute('GET', '/reservation/{reservationNo}', ['IndexController', 'printReservationInfo']);
     $r->addRoute('DELETE', '/reservation/{reservationNo}', ['IndexController', 'cancelReservation']);
-    $r->addRoute('GET', '/payment/{reservationNo}', ['IndexController', 'printPaymentInfo']);
+    $r->addRoute('GET', '/payment/{paymentNo}', ['IndexController', 'printPaymentInfo']);
+
 
 
 //    $r->addRoute('GET', '/users', 'get_all_users_handler');

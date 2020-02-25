@@ -30,8 +30,20 @@ try {
         case "test":
             http_response_code(200);
 
-            $test = geocode();
-            echo $test;
+            //$test = geocode();
+
+            $idx = $_GET["idx"];
+//            $test= password_hash($idx, PASSWORD_DEFAULT);
+            IF( password_verify('14', $test)){
+                echo hi;
+            }
+
+            $test= pullEncPw($idx);
+            IF( password_verify('abcdefg3', $test['encryptedPw'])){
+                echo hi;
+            }
+
+
 
             $res->isSuccess = TRUE;
             $res->code = 100;
@@ -43,7 +55,7 @@ try {
         /*
          * API No. 1
          * API Name : 회원가입 API
-         * 마지막 수정 날짜 : 20.02.19
+         * 마지막 수정 날짜 : 20.02.24
          */
         case "register":
             if($req->ToSAgreementOne!='Y' | $req->ToSAgreementTwo!='Y' | $req->ToSAgreementThree!='Y' | $req->ToSAgreementFour!='Y'){
@@ -157,6 +169,7 @@ try {
                 return;
             }
 
+            //면허 유효 끝 시간이 면혀 유효 시작 시간과 현재 시간 이후인지 검사
             $checkLicenseDate = preg_match("/^(19|20)(?:[0-9]{2}\/(?:0[1-9]|1[0-2])\/(?:0[1-9]|[1,2][0-9]|3[0,1]))$/", $req->licenseDate);
             $checkLicenseExpiryDate = preg_match("/^(19|20)(?:[0-9]{2}\/(?:0[1-9]|1[0-2])\/(?:0[1-9]|[1,2][0-9]|3[0,1]))$/", $req->licenseExpiryDate);
             $licenseDateYear = substr($req->licenseDate, 0, 4);
@@ -207,16 +220,25 @@ try {
                 }
             }
 
-            //나중에 트랜잭션 다시 시도
-            registerAccount($req->name, $req->residentNo, $req->gender, $req->phoneNo, $req->id, $req->pw,
-                $req->cardNo, $req->cardDate, $req->ToSAgreementOne, $req->ToSAgreementTwo, $req->ToSAgreementThree, $req->ToSAgreementFour,
-                $req->licenseType, $req->licenseRegion, $req->licenseNo, $req->licenseExpiryDate, $req->licenseDate, $req->licenseAgreement);
+            $encryptedPw= password_hash($req->pw, PASSWORD_DEFAULT);
+            $transactionCheck = registerAccount($req->name, $req->residentNo, $req->gender, $req->phoneNo, $req->id, $encryptedPw,
+                $req->cardNo, $req->cardDate, $req->licenseType, $req->licenseRegion, $req->licenseNo, $req->licenseExpiryDate, $req->licenseDate);
+            if( $transactionCheck=='commitComplete') {
+                $res->isSuccess = TRUE;
+                $res->code = 100;
+                $res->message = "회원 가입 성공";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            } else {
+                $res->isSuccess = FALSE;
+                $res->code = 200;
+                $res->message = "회원 가입 실패";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            }
 
-            $res->isSuccess = TRUE;
-            $res->code = 100;
-            $res->message = "회원 가입 성공";
-            echo json_encode($res, JSON_NUMERIC_CHECK);
-            break;
+
+
 
         /*
          * API No. 3
@@ -239,59 +261,46 @@ try {
                 return;
             }
 
+            //default 이용 시간(현재 시간+10+a분 ~ 4시간뒤)
             $reservationDay= "오늘 ";
             if ( 0<=date("i") & date("i")<10){
                 $reservationStartTime= strtotime((date("H")).":20");
-                $reservationEndTime= strtotime((date("H")).":50");
+                $reservationEndTime= strtotime((date("H")).":20 +4 hour");
             } else  if ( 10<=date("i") & date("i")<20){
                 $reservationStartTime= strtotime((date("H")).":30");
-                if( date("H")==23 ){
-                    $reservationEndTime= strtotime((date("H")+1).":00 +1 day");
-                } else {
-                    $reservationEndTime= strtotime((date("H")+1).":00");
-                }
+                $reservationEndTime= strtotime((date("H")).":30 +4 hour");
             } else  if ( 20<=date("i") & date("i")<30){
                 $reservationStartTime= strtotime((date("H")).":40");
-                if( date("H")==23 ){
-                    $reservationEndTime= strtotime((date("H")+1).":10 +1 day");
-                } else {
-                    $reservationEndTime= strtotime((date("H")+1).":10");
-                }
-            } else  if ( 30<=date("i") & date("i")<40){
+                $reservationEndTime= strtotime((date("H")).":40 +4 hour");
+            } else  if ( 30<=date("i") & date("i")<40) {
                 $reservationStartTime= strtotime((date("H")).":50");
-                if( date("H")==23 ) {
-                    $reservationEndTime = strtotime((date("H") + 1) . ":20 +1 day");
-                } else {
-                    $reservationEndTime = strtotime((date("H") + 1) . ":20");
-                }
+                $reservationEndTime = strtotime((date("H")) . ":50 +4 hour");
             } else  if ( 40<=date("i") & date("i")<50){
-                if( date("H")==23 ){
-                    $reservationDay= "내일 ";
-                    $reservationStartTime= strtotime((date("H")+1).":00 +1 day");
-                    $reservationEndTime= strtotime((date("H")+1).":30 +1 day");
-                } else {
-                    $reservationStartTime= strtotime((date("H")+1).":00");
-                    $reservationEndTime= strtotime((date("H")+1).":30");
+                if( date("H")==23 ) {
+                    $reservationDay = "내일 ";
                 }
+                $reservationStartTime= strtotime((date("H")).":00 +1 hour");
+                $reservationEndTime= strtotime((date("H")).":00 +4 hour");
             } else  if ( 50<=date("i") & date("i")<60){
-                if( date("H")==23 ){
-                    $reservationDay= "내일 ";
-                    $reservationStartTime = strtotime((date("H") + 1) . ":10 +1 day");
-                    $reservationEndTime = strtotime((date("H") + 1) . ":40 +1 day");
-                } else {
-                    $reservationStartTime = strtotime((date("H") + 1) . ":10");
-                    $reservationEndTime = strtotime((date("H") + 1) . ":40");
+                if( date("H")==23 ) {
+                    $reservationDay = "내일 ";
                 }
+                $reservationStartTime= strtotime((date("H")).":10 +1 hour");
+                $reservationEndTime= strtotime((date("H")).":10 +4 hour");
             }
 
-
+            //시작, 끝 시간이 올바르게 입력됐을 시, 시작 시간이 현재 시간보다 뒤이며 시작,끝 시간이 30분 이상 차이나는지 검사 후 이용 시간으로 설정 + 끝 시간이 시작 시간으로부터 14일 초과 여부 검사
             $checkStartTime = preg_match("/^(?:[0-9]{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[1,2][0-9]|3[0,1])\s(?:[0-1][0-9]|2[0-3])\:([0-5]0))$/", $startTime);
             $checkEndTime = preg_match("/^(?:[0-9]{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[1,2][0-9]|3[0,1])(\s?)(?:[0-1][0-9]|2[0-3])\:([0-5]0))$/", $endTime);
             $afterThirtyFromStart = date("y-m-d H:i", strtotime($startTime."+30 minute"));
+            $afterFourteenFromStart = date("y-m-d H:i", strtotime($startTime."+14 day"));
 
-            if($startTime!=null & $endTime!=null & $checkStartTime==true & $checkEndTime==true & date("y-m-d H:i") < $afterThirtyFromStart & $afterThirtyFromStart <= date("y-m-d H:i", strtotime($endTime))  ){
+            $day = array("일","월","화","수","목","금","토");
+            if($startTime!=null & $endTime!=null & $checkStartTime==true & $checkEndTime==true & date("y-m-d H:i") <  date("y-m-d H:i", strtotime($startTime))
+                & $afterThirtyFromStart <= date("y-m-d H:i", strtotime($endTime)) & date("y-m-d H:i", strtotime($endTime)) < $afterFourteenFromStart ){
                 $reservationStartTime = strtotime($startTime);
                 $reservationEndTime = strtotime($endTime);
+                $reservationDay= date("m/d", strtotime($startTime))."(".$day[date('w', strtotime($startTime))].") ";
             }
 
             $data = getDataByJWToken($jwt, JWT_SECRET_KEY);
@@ -306,11 +315,11 @@ try {
             $useTime = $reservationDay.date("H:i", $reservationStartTime)." - ".date("H:i", $reservationEndTime);
             $res->result->useTime= $useTime;
 
+            //배열로 들어온 model값을 변환해서 mysql내 set type으로 전달
             if($model != null){
                 $carModelString = '\''.implode('\',\'', $model).'\'';
                 $res->result->socarzone = printSocarzoneByModel(date("Y-m-d H:i:s", $reservationStartTime), date("Y-m-d H:i:s", $reservationEndTime), $carModelString);
             } else {
-                echo isnull;
                 $res->result->socarzone = printSocarzone(date("Y-m-d H:i:s", $reservationStartTime), date("Y-m-d H:i:s", $reservationEndTime));
             }
 
@@ -323,27 +332,210 @@ try {
 
         /*
          * API No. 4
-         * API Name : 쏘카 선택 API
-         * 마지막 수정 날짜 : 20.02.17
+         * API Name : 쏘카 조회 API
+         * 마지막 수정 날짜 : 20.02.25
          */
         case "selectSocar":
+            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
+            $startTime = $_GET["startTime"];
+            $endTime = $_GET["endTime"];
+            $model = $_GET["model"];
 
-            $res->result->socarzoneAddress = "무지개마을KCC아파트 102동";
-            $res->result->useTime = 30;
-            $res->result->startTime=20200215181000;
-            $res->result->endTime=20200215221000;
-            $res->result->carList[0]->carNo =1;
-            $res->result->carList[0]->available ="Y";
-            $res->result->carList[0]->profileUrl =null;
-            $res->result->carList[0]->model="투싼";
-            $res->result->carList[0]->cost =3680;
-            $res->result->carList[0]->schedule[0]->otherStartTime ="20200215131000";
-            $res->result->carList[0]->schedule[0]->otherEndTime ="20200215151000";
-            $res->result->carList[1]->carNo =2;
-            $res->result->carList[1]->available ="Y";
-            $res->result->carList[1]->profileUrl =null;
-            $res->result->carList[1]->model="모닝";
-            $res->result->carList[1]->cost =1680;
+            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "유효하지 않은 토큰입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
+
+            $res->result->adress= json_decode(json_encode(printSocarzoneAddress($vars['socarzoneNo'])))->{'address'};
+
+            //default 시간. 3번 api에서 최종 시간 출력한 후 가져오면 삭제해도 됨
+            $reservationDay= "오늘 ";
+            if ( 0<=date("i") & date("i")<10){
+                $reservationStartTime= strtotime((date("H")).":20");
+                $reservationEndTime= strtotime((date("H")).":20 +4 hour");
+            } else  if ( 10<=date("i") & date("i")<20){
+                $reservationStartTime= strtotime((date("H")).":30");
+                $reservationEndTime= strtotime((date("H")).":30 +4 hour");
+            } else  if ( 20<=date("i") & date("i")<30){
+                $reservationStartTime= strtotime((date("H")).":40");
+                $reservationEndTime= strtotime((date("H")).":40 +4 hour");
+            } else  if ( 30<=date("i") & date("i")<40) {
+                $reservationStartTime= strtotime((date("H")).":50");
+                $reservationEndTime = strtotime((date("H")) . ":50 +4 hour");
+            } else  if ( 40<=date("i") & date("i")<50){
+                if( date("H")==23 ) {
+                    $reservationDay = "내일 ";
+                }
+                $reservationStartTime= strtotime((date("H")).":00 +1 hour");
+                $reservationEndTime= strtotime((date("H")).":00 +4 hour");
+            } else  if ( 50<=date("i") & date("i")<60){
+                if( date("H")==23 ) {
+                    $reservationDay = "내일 ";
+                }
+                $reservationStartTime= strtotime((date("H")).":10 +1 hour");
+                $reservationEndTime= strtotime((date("H")).":10 +4 hour");
+            }
+
+            $checkStartTime = preg_match("/^(?:[0-9]{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[1,2][0-9]|3[0,1])\s(?:[0-1][0-9]|2[0-3])\:([0-5]0))$/", $startTime);
+            $checkEndTime = preg_match("/^(?:[0-9]{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[1,2][0-9]|3[0,1])(\s?)(?:[0-1][0-9]|2[0-3])\:([0-5]0))$/", $endTime);
+            $afterThirtyFromStart = date("y-m-d H:i", strtotime($startTime."+30 minute"));
+            $afterFourteenFromStart = date("y-m-d H:i", strtotime($startTime."+14 day"));
+
+            $day = array("일","월","화","수","목","금","토");
+            if($startTime!=null & $endTime!=null & $checkStartTime==true & $checkEndTime==true & date("y-m-d H:i") <  date("y-m-d H:i", strtotime($startTime))
+                & $afterThirtyFromStart <= date("y-m-d H:i", strtotime($endTime)) & date("y-m-d H:i", strtotime($endTime)) < $afterFourteenFromStart ){
+//                $reservationStartTime = strtotime($startTime); date로 넣으면 값 이상해짐
+//                $reservationEndTime = strtotime($endTime);
+                $reservationDay= date("m/d", strtotime($startTime))." (".$day[date('w', strtotime($startTime))].") ";
+            }
+
+            $useTime = (strtotime($endTime)-strtotime($startTime))/60;
+            $useDay=floor($useTime/1440);
+            $useHour=floor(($useTime%1440)/60);
+            $useMinute=floor(($useTime%1440)/60);
+
+            if ( $useDay != 0) {
+                if ($useHour != 0) {
+                    if ($useMinute != 0) {
+                        $res->result->useTime = "총 " . $useDay . "일 " . $useHour . "시간 " . $useMinute . "0분 " . "이용";
+                    } else {
+                        $res->result->useTime = "총 " . $useDay . "일 " . $useHour . "시간 " . "이용";
+                    }
+                } else {
+                    if ($useMinute != 0) {
+                        $res->result->useTime = "총 " . $useDay . "일 " . $useMinute . "0분 " . "이용";
+                    } else {
+                        $res->result->useTime = "총 " . $useDay . "일 " . "이용";
+                    }
+                }
+            } else {
+                if ($useHour != 0) {
+                    if ($useMinute != 0) {
+                        $res->result->useTime = "총 " . $useHour . "시간 " . $useMinute . "0분 " . "이용";
+                    } else {
+                        $res->result->useTime = "총 " .  $useHour . "시간 " . "이용";
+                    }
+                } else {
+                    $res->result->useTime = "총 " . $useMinute . "0분 " . "이용";
+                }
+            }
+
+            $res->result->startTime= $reservationDay. date("H:i", strtotime($startTime));
+            //date("Y-m-d H:i:s", $reservationStartTime), date("Y-m-d H:i:s", $reservationEndTime);
+
+            $carList =printCars($vars['socarzoneNo']);
+            $res->result->carList= $carList;
+
+            $encodedCarList = json_encode($carList);
+            $decodedCarList = json_decode($encodedCarList);
+
+
+
+            $midnight = date("y-m-d", strtotime($endTime)) . " 00:00:00";
+            //이용 시간이 10시간 이하면 요일과 이용 시간으로 요금 계산, 10시간 이상이면 요일과 이용 일수로 요금 계산
+            $useTime = (strtotime($endTime) - strtotime($startTime)) / 60;
+            if ($useTime < 600) {
+                if (floor((strtotime($endTime) - strtotime($startTime)) / 86400) == 0) { // 시작날짜와 끝날짜가 같은지 확인
+                    if (date("w", strtotime($startTime)) == 6 | date("w", strtotime($startTime)) == 0) {
+                        $chargeCriteria = 'weekendTenMinuteCharge';
+                        $finalUseTime = $useTime / 10;
+                    } else {
+                        $chargeCriteria = 'weekdayTenMinuteCharge';
+                        $finalUseTime = $useTime / 10;
+                    }
+                } else { //자정기준으로 시작날짜 시간과 요금(주말,평일), 끝날짜 시간과 요금(주말,평일) 계산
+                    if (date("w", strtotime($startTime)) == 6 | date("w", strtotime($startTime)) == 0) {
+                        $chargeCriteria = 'weekendTenMinuteCharge';
+                        $firstDayUseTime = (strtotime($midnight) - strtotime($startTime)) / 60;
+                    } else {
+                        $chargeCriteria = 'weekdayTenMinuteCharge';
+                        $firstDayUseTime = (strtotime($midnight) - strtotime($startTime)) / 60;
+                    }
+                    if (date("w", strtotime($endTime)) == 6 | date("w", strtotime($endTime)) == 0) {
+                        $chargeCriteria = 'weekendTenMinuteCharge';
+                        $lastDayUseTime = (strtotime($endTime) - strtotime($midnight)) / 60;
+                    } else {
+                        $chargeCriteria = 'weekdayTenMinuteCharge';
+                        $lastDayUseTime = (strtotime($endTime) - strtotime($midnight)) / 60;
+                    }
+                    $finalUseTime= $firstDayUseTime + $lastDayUseTime;
+                }
+            } else {
+                if (floor((strtotime($endTime) - strtotime($startTime)) / 86400) == 0) {
+                    if (date("w", strtotime($startTime)) == 6 | date("w", strtotime($startTime)) == 0) {
+                        $chargeCriteria = 'weekendCharge';
+                    } else {
+                        $chargeCriteria = 'weekdayCharge';
+                    }
+                    $finalUseTime=1;
+                } else { //이틀 이상일 경우 주말, 평일별 일 수와 요금 계산
+                    $calDate = floor((strtotime($endTime) - strtotime($startTime)) / 86400) - 1;
+                    $startDay = date("w", strtotime($startTime));
+                    if ($startDay == 0) {
+                        $cntSun = floor(($startDay + $calDate) / 7) + 1;
+                    } else {
+                        $cntSun = floor(($startDay + $calDate) / 7);
+                    }
+
+                    if (($startDay + $calDate) % 7 == 6) {
+                        $cntSat = floor(($startDay + $calDate) / 7) + 1;
+                    } else {
+                        $cntSat = floor(($startDay + $calDate) / 7);
+                    }
+
+                    $cntWeekend = $cntSun + $cntSat;
+                    $cntWeekday = $calDate + 1 - $cntWeekend;
+
+                    $forForCal = 'Y';//이틀 이상일 경우를 체크하는 변수. 이틀 이상이면 carNo 활용을 위해 기존 코드를 for문 내로 옮김.
+                }
+            }
+            $startMidnight = date("y-m-d", strtotime($startTime)) . " 00:00:00";
+            $endMidnight = date("y-m-d", strtotime($endTime. "+1 day")) . " 00:00:00";
+
+            for($i=0; ;$i++) {
+                if (!$decodedCarList[$i]->{'carNo'}) {
+                    break;
+                }
+                $carNo = $decodedCarList[$i]->{'carNo'};
+
+                if($forForCal == 'Y'){
+                    $totalWeekendCharge = calculationPayment('weekendCharge', $cntWeekend, $carNo);
+                    $totalWeekdayCharge = calculationPayment('weekdayCharge', $cntWeekday, $carNo);
+
+                    $encodedTotalWeekendCharge = json_encode($totalWeekendCharge);
+                    $decodedTotalWeekendCharge = json_decode($encodedTotalWeekendCharge);
+                    $encodedTotalWeekdayCharge = json_encode($totalWeekdayCharge);
+                    $decodedTotalWeekdayCharge = json_decode($encodedTotalWeekdayCharge);
+
+                    $chargeCriteria= $decodedTotalWeekendCharge->{'rentCharge'} + $decodedTotalWeekdayCharge->{'rentCharge'};
+                    $finalUseTime=1;
+                    //$decodedTotalCalculationPayment->rentCharge = $decodedTotalWeekendCharge->{'rentCharge'} + $decodedTotalWeekdayCharge->{'rentCharge'};
+                }
+
+                $totalCalculationPayment = calculationPayment($chargeCriteria, $finalUseTime, $carNo);
+                $encodedTotalCalculationPayment = json_encode($totalCalculationPayment);
+                $decodedTotalCalculationPayment = json_decode($encodedTotalCalculationPayment);
+
+                $res->result->carList[$i]['cost'] = number_format($decodedTotalCalculationPayment->{'rentCharge'}) . "원";
+
+                $checkAvailable = (checkSchedule( date("Y-m-d H:i:s", $reservationStartTime), date("Y-m-d H:i:s", $reservationEndTime), $carNo));
+                if($checkAvailable!=null ) {
+                    $res->result->carList[$i]['available'] = 'N';
+                } else {
+                    $res->result->carList[$i]['available'] = 'Y';
+                }
+
+                $checkSchedule = (checkSchedule($startMidnight, $endMidnight, $carNo));
+                if($checkSchedule!=null ) {
+                    $res->result->carList[$i]['schedule'] = $checkSchedule;
+                }
+
+
+            }
 
             $res->isSuccess = TRUE;
             $res->code = 100;
@@ -354,13 +546,12 @@ try {
 
         /*
          * API No. 5
-         * API Name : 보험 선택 API
+         * API Name : 보험 조회 API
          * 마지막 수정 날짜 : 20.02.21
          */
         case "selectInsurance":
 
             $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
-            $model = $_GET["model"];
             $startTime = $_GET["startTime"];
             $endTime = $_GET["endTime"];
 
@@ -384,7 +575,7 @@ try {
             }
 
             $insuranceTime= ceil((strtotime($endTime)-strtotime($startTime))/3600);
-            $res->result = selectInsurance($model, $insuranceTime);
+            $res->result = selectInsurance($vars["carNo"], $insuranceTime);
 
             $res->isSuccess = TRUE;
             $res->code = 100;
@@ -398,60 +589,59 @@ try {
          * API Name : 대여 정보 확인 API
          * 마지막 수정 날짜 : 20.02.22
          */
-        case "checkReservationInfo":
+//        case "checkReservationInfo":
+//
+//            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
+//
+//            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+//                $res->isSuccess = FALSE;
+//                $res->code = 201;
+//                $res->message = "유효하지 않은 토큰입니다";
+//                echo json_encode($res, JSON_NUMERIC_CHECK);
+//                addErrorLogs($errorLogs, $res, $req);
+//                return;
+//            }
+//            $startTime = $_GET["startTime"];
+//            $endTime = $_GET["endTime"];
+//            $carNo= $_GET["model"];
+//            $insurance= $_GET["insurance"];
 
-            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
 
-            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
-                $res->isSuccess = FALSE;
-                $res->code = 201;
-                $res->message = "유효하지 않은 토큰입니다";
-                echo json_encode($res, JSON_NUMERIC_CHECK);
-                addErrorLogs($errorLogs, $res, $req);
-                return;
-            }
-            $startTime = $_GET["startTime"];
-            $endTime = $_GET["endTime"];
-            $carNo= $_GET["model"];
-            $insurance= $_GET["insurance"];
-
-
-//            시간 가공, useTime은 sql밖에서 따로 집어넣기?
+//            +시간 가공, useTime / 결과값 체크
 //            $res->result = checkReservationInfo($startTime, $endTime, $carNo, $insurance);
 //            $res->result['safetyOption']= explode(',', $res->result['safetyOption']);
 //            $res->result['convenienceOption']= explode(',', $res->result['convenienceOption']);
-//            결과값 체크
 
-
-            $res->result->carNo =1;
-            $res->result->model = "올뉴모닝";
-            $res->result->fuelType= "휘발유";
-            $res->result->safetyOption[0]="에어백";
-            $res->result->safetyOption[1]="후방감지센서";
-            $res->result->safetyOption[2]="블랙박스";
-            $res->result->safetyOption[3]="네비게이션";
-            $res->result->convenienceOption[0]="에어컨";
-            $res->result->convenienceOption[1]="열선시트";
-            $res->result->profileUrl= null;
-            $res->result->distanceChargeOne="170원";
-            $res->result->distanceChargeTwo="150원";
-            $res->result->distanceChargeThree="130원";
-            $res->result->useTime="총 30분 이용";
-            $res->result->startTime="20200215181000";
-            $res->result->endTime="20200215221000";
-            $res->result->socarzoneAddress="문화공영주차장";
-            $res->result->totalCharge="2,170원";
-
-            $res->isSuccess = TRUE;
-            $res->code = 100;
-            $res->message = "조회 성공";
-            echo json_encode($res, JSON_NUMERIC_CHECK);
-            break;
+//
+//            $res->result->carNo =1;
+//            $res->result->model = "올뉴모닝";
+//            $res->result->fuelType= "휘발유";
+//            $res->result->safetyOption[0]="에어백";
+//            $res->result->safetyOption[1]="후방감지센서";
+//            $res->result->safetyOption[2]="블랙박스";
+//            $res->result->safetyOption[3]="네비게이션";
+//            $res->result->convenienceOption[0]="에어컨";
+//            $res->result->convenienceOption[1]="열선시트";
+//            $res->result->profileUrl= null;
+//            $res->result->distanceChargeOne="170원";
+//            $res->result->distanceChargeTwo="150원";
+//            $res->result->distanceChargeThree="130원";
+//            $res->result->useTime="총 30분 이용";
+//            $res->result->startTime="20200215181000";
+//            $res->result->endTime="20200215221000";
+//            $res->result->socarzoneAddress="문화공영주차장";
+//            $res->result->totalCharge="2,170원";
+//
+//            $res->isSuccess = TRUE;
+//            $res->code = 100;
+//            $res->message = "조회 성공";
+//            echo json_encode($res, JSON_NUMERIC_CHECK);
+//            break;
 
 
         /*
          * API No. 7
-         * API Name : 차량 정보 확인 API
+         * API Name : 차량 정보 조회 API
          * 마지막 수정 날짜 : 20.02.22
          */
         case "checkCarInfo":
@@ -481,14 +671,117 @@ try {
         /*
          * API No. 8
          * API Name : 결제 정보 확인 API
-         * 마지막 수정 날짜 : 20.02.17
+         * 마지막 수정 날짜 : 20.02.25
          */
         case "checkPaymentInfo":
 
-            $res->result->rentCharge="2,520원";
-            $res->result->insuraceCharge="2,170원";
-            $res->result->cardInfo="개인(등록일 2020/02/13)";
-            $res->result->totalCharge="2,170원";
+            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
+            $startTime = $_GET["startTime"];
+            $endTime = $_GET["endTime"];
+            $carNo = $_GET["carNo"];
+            $insuranceType = $_GET["insurance"];
+
+            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "유효하지 않은 토큰입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
+
+
+            //4번 api에서 가져오면 삭제해도 됨
+            $midnight = date("y-m-d", strtotime($endTime)) . " 00:00:00";
+            //이용 시간이 10시간 이하면 요일과 이용 시간으로 요금 계산, 10시간 이상이면 요일과 이용 일수로 요금 계산
+            $useTime = (strtotime($endTime) - strtotime($startTime)) / 60;
+            if ($useTime < 600) {
+                if (floor((strtotime($endTime) - strtotime($startTime)) / 86400) == 0) { // 시작날짜와 끝날짜가 같은지 확인
+                    if (date("w", strtotime($startTime)) == 6 | date("w", strtotime($startTime)) == 0) {
+                        $chargeCriteria = 'weekendTenMinuteCharge';
+                        $finalUseTime = $useTime / 10;
+                    } else {
+                        $chargeCriteria = 'weekdayTenMinuteCharge';
+                        $finalUseTime = $useTime / 10;
+                    }
+                } else { //자정기준으로 시작날짜 시간과 요금(주말,평일), 끝날짜 시간과 요금(주말,평일) 계산
+                    if (date("w", strtotime($startTime)) == 6 | date("w", strtotime($startTime)) == 0) {
+                        $chargeCriteria = 'weekendTenMinuteCharge';
+                        $firstDayUseTime = (strtotime($midnight) - strtotime($startTime)) / 60;
+                    } else {
+                        $chargeCriteria = 'weekdayTenMinuteCharge';
+                        $firstDayUseTime = (strtotime($midnight) - strtotime($startTime)) / 60;
+                    }
+                    if (date("w", strtotime($endTime)) == 6 | date("w", strtotime($endTime)) == 0) {
+                        $chargeCriteria = 'weekendTenMinuteCharge';
+                        $lastDayUseTime = (strtotime($endTime) - strtotime($midnight)) / 60;
+                    } else {
+                        $chargeCriteria = 'weekdayTenMinuteCharge';
+                        $lastDayUseTime = (strtotime($endTime) - strtotime($midnight)) / 60;
+                    }
+                }
+            } else {
+                if (floor((strtotime($endTime) - strtotime($startTime)) / 86400) == 0) {
+                    if (date("w", strtotime($startTime)) == 6 | date("w", strtotime($startTime)) == 0) {
+                        $chargeCriteria = 'weekendCharge';
+                    } else {
+                        $chargeCriteria = 'weekdayCharge';
+                    }
+                    $finalUseTime=1;
+                } else { //이틀 이상일 경우 주말, 평일별 일 수와 요금 계산
+                    $calDate = floor((strtotime($endTime) - strtotime($startTime)) / 86400) - 1;
+                    $startDay = date("w", strtotime($startTime));
+                    if ($startDay == 0) {
+                        $cntSun = floor(($startDay + $calDate) / 7) + 1;
+                    } else {
+                        $cntSun = floor(($startDay + $calDate) / 7);
+                    }
+
+                    if (($startDay + $calDate) % 7 == 6) {
+                        $cntSat = floor(($startDay + $calDate) / 7) + 1;
+                    } else {
+                        $cntSat = floor(($startDay + $calDate) / 7);
+                    }
+
+                    $cntWeekend = $cntSun + $cntSat;
+                    $cntWeekday = $calDate + 1 - $cntWeekend;
+
+                    $totalWeekendCharge = calculationPayment('weekendCharge', $cntWeekend, $carNo);
+                    $totalWeekdayCharge = calculationPayment('weekdayCharge', $cntWeekday, $carNo);
+
+                    $encodedTotalWeekendCharge = json_encode($totalWeekendCharge);
+                    $decodedTotalWeekendCharge = json_decode($encodedTotalWeekendCharge);
+                    $encodedTotalWeekdayCharge = json_encode($totalWeekdayCharge);
+                    $decodedTotalWeekdayCharge = json_decode($encodedTotalWeekdayCharge);
+
+                    $chargeCriteria= $decodedTotalWeekendCharge->{'rentCharge'} + $decodedTotalWeekdayCharge->{'rentCharge'};
+                    $finalUseTime=1;
+
+                    //$decodedTotalCalculationPayment->rentCharge = $decodedTotalWeekendCharge->{'rentCharge'} + $decodedTotalWeekdayCharge->{'rentCharge'};
+                }
+            }
+            $totalCalculationPayment = calculationPayment($chargeCriteria, $finalUseTime, $carNo);
+            $encodedTotalCalculationPayment = json_encode($totalCalculationPayment);
+            $decodedTotalCalculationPayment = json_decode($encodedTotalCalculationPayment);
+
+            $res->result->rentCharge= number_format($decodedTotalCalculationPayment->{'rentCharge'})."원";
+
+
+            $insuranceTime= ceil($useTime/720); // 보험 요금은 12시간 단위로 적용
+            $insurance= $insuranceType."Charge";
+            $totalInsuranceCharge = printInsuranceCharge($insurance, $insuranceTime, $carNo);
+
+            $encodedTotalInsuranceCharge = json_encode($totalInsuranceCharge);
+            $decodedTotalInsuranceCharge = json_decode($encodedTotalInsuranceCharge);
+            $res->result->insuranceCharge= number_format($decodedTotalInsuranceCharge->{'insuranceCharge'})."원";
+
+            $data = getDataByJWToken($jwt, JWT_SECRET_KEY);
+            $cardInfo = cardInfo($data->id);
+            $encodedCardInfo = json_encode($cardInfo);
+            $decodedCardInfo = json_decode($encodedCardInfo);
+
+            $res->result->cardInfo= "개인(등록일 ".date("y/m/d", strtotime($decodedCardInfo->{'createdAt'})).")";
+            $res->result->totalCharge= number_format($decodedTotalInsuranceCharge->{'insuranceCharge'}+$decodedTotalCalculationPayment->{'rentCharge'})."원";
 
             $res->isSuccess = TRUE;
             $res->code = 100;
@@ -500,9 +793,40 @@ try {
         /*
          * API No. 9
          * API Name : 차량 예약 API
-         * 마지막 수정 날짜 : 20.02.17
+         * 마지막 수정 날짜 : 20.02.25
          */
         case "makeReservation":
+            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
+
+            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "유효하지 않은 토큰입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
+
+            if($req->reservationAgreementOne!='Y' | $req->reservationAgreementTwo!='Y' | $req->reservationAgreementThree!='Y' | $req->reservationAgreementFour!='Y'){
+                $res->isSuccess = FALSE;
+                $res->code = 209;
+                $res->message = "모든 약관에 모두 동의해야 합니다.";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            }
+
+            //면허 갱신, 입력받은 날짜. 그 시간에 그번호 예약있는지확인!.
+
+            //start,endtime가공? 초까지 00으로.,   socarzoneaddres, data->id, carNo, insurance, reservation으로 집어넣기
+            //결제까지 원큐에
+
+
+
+
+
+
+
+
             $res->isSuccess = TRUE;
             $res->code = 100;
             $res->message = "예약 성공";
@@ -513,23 +837,86 @@ try {
         /*
          * API No. 10
          * API Name : 가까운 예약 확인 API
-         * 마지막 수정 날짜 : 20.02.17
+         * 마지막 수정 날짜 : 20.02.25
          */
         case "checkCloseReservation":
+            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
 
-            $res->result->carNo =1;
-            $res->result->model = "올뉴모닝";
-            $res->result->fuelType= "휘발유";
-            $res->result->safetyOption[0]="에어백";
-            $res->result->safetyOption[1]="후방감지센서";
-            $res->result->safetyOption[2]="블랙박스";
-            $res->result->safetyOption[3]="네비게이션";
-            $res->result->convenienceOption[0]="에어컨";
-            $res->result->convenienceOption[1]="열선시트";
-            $res->result->socarzoneAddress="문화공영주차장";
-            $res->result->startTime="20200215181000";
-            $res->result->endTime="20200215221000";
-            $res->result->status="reservation";
+            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "유효하지 않은 토큰입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
+
+            $data = getDataByJWToken($jwt, JWT_SECRET_KEY);
+            $printRecentReservation = printRecentReservation($data->id);
+
+            $res->result = $printRecentReservation;
+            $res->result['safetyOption']= explode(',', $res->result['safetyOption']);
+            $res->result['convenienceOption']= explode(',', $res->result['convenienceOption']);
+
+
+            $day = array("일","월","화","수","목","금","토");
+            if (date("y-m-d")==date("y-m-d", strtotime($res->result['startTime']))){
+                $reservationDay= "오늘 ";
+            } else if (date("y-m-d")==date("y-m-d", strtotime($res->result['startTime'] ."-1 day"))) {
+                $reservationDay= "내일 ";
+            } else {
+                $reservationDay= date("m/d", strtotime($res->result['startTime']))." (".$day[date('w', strtotime($res->result['startTime']))].") ";
+            }
+            if (date("y-m-d")==date("y-m-d", strtotime($res->result['endTime']))){
+                $reservationEndDay= "오늘 ";
+            } else if (date("y-m-d")==date("y-m-d", strtotime($res->result['endTime'] ."-1 day"))) {
+                $reservationEndDay= "내일 ";
+            } else {
+                $reservationEndDay= date("m/d", strtotime($res->result['endTime']))." (".$day[date('w', strtotime($res->result['endTime']))].") ";
+            }
+            $endTime=$res->result['endTime'];
+
+            $res->result['startTime']= $reservationDay.date("H:i", strtotime($res->result['startTime']))." 부터";
+            $res->result['endTime']= $reservationDay.date("H:i", strtotime($res->result['endTime']));
+
+
+            $status= json_decode(json_encode($printRecentReservation))->{'status'};
+            if ($status=='reservation'){
+                unset($res->result['licensePlateNo']);
+            }
+
+            $useTime = floor((strtotime($endTime)-strtotime(date("Y-m-d H:i:s")))/60);
+            $useDay=floor($useTime/1440);
+            $useHour=floor(($useTime%1440)/60);
+            $useMinute=floor(($useTime%1440)/60);
+            if( $status=='rented') {
+                if ($useDay != 0) {
+                    if ($useHour != 0) {
+                        if ($useMinute != 0) {
+                            $res->result['useTime'] = "이용시간 " . $useDay . "일 " . $useHour . "시간 " . $useMinute . "분 " . "남음";
+                        } else {
+                            $res->result['useTime'] = "이용시간 " . $useDay . "일 " . $useHour . "시간 " . "남음";
+                        }
+                    } else {
+                        if ($useMinute != 0) {
+                            $res->result['useTime'] = "이용시간 " . $useDay . "일 " . $useMinute . "분 " . "남음";
+                        } else {
+                            $res->result['useTime'] = "이용시간 " . $useDay . "일 " . "이용";
+                        }
+                    }
+                } else {
+                    if ($useHour != 0) {
+                        if ($useMinute != 0) {
+                            $res->result['useTime'] = "이용시간 " . $useHour . "시간 " . $useMinute . "분 " . "남음";
+                        } else {
+                            $res->result['useTime'] = "이용시간 " . $useHour . "시간 " . "남음";
+                        }
+                    } else {
+                        $res->result['useTime'] = "이용시간 " . $useMinute . "분 " . "남음";
+                    }
+                }
+            }
+
 
             $res->isSuccess = TRUE;
             $res->code = 100;
@@ -557,6 +944,9 @@ try {
          * 마지막 수정 날짜 : 20.02.17
          */
         case "printMenu":
+
+
+
 
             $res->result->userNo=1;
             $res->result->name= "김강혁";
