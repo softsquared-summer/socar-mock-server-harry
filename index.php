@@ -39,6 +39,8 @@ $dispatcher = FastRoute\simpleDispatcher(function (FastRoute\RouteCollector $r) 
     $r->addRoute('DELETE', '/reservation/{reservationNo}', ['IndexController', 'cancelReservation']);
     $r->addRoute('GET', '/payment/{paymentNo}', ['IndexController', 'printPaymentInfo']);
 
+    
+
 
 
 //    $r->addRoute('GET', '/users', 'get_all_users_handler');

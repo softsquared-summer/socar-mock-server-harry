@@ -30,18 +30,20 @@ try {
         case "test":
             http_response_code(200);
 
-            //$test = geocode();
 
-            $idx = $_GET["idx"];
-//            $test= password_hash($idx, PASSWORD_DEFAULT);
-            IF( password_verify('14', $test)){
-                echo hi;
-            }
+//            $idx = $_GET["idx"];
+//            test($idx);
 
-            $test= pullEncPw($idx);
-            IF( password_verify('abcdefg3', $test['encryptedPw'])){
-                echo hi;
-            }
+//               $test= test();
+//            $fcmRes = json_decode(json_encode($test));
+//            $fcmTocken= $fcmRes[0]->{'fcmToken'};
+//            echo $fcmTocken;
+//            echo $fcmRes[0]->{'deviceType'};
+
+            //sendFcm('');
+
+//            //echo $fcmRes;
+//            echo $fcmRes[0]->{'fcmTocken'};
 
 
 
@@ -220,6 +222,7 @@ try {
                 }
             }
 
+            //비밀번호 암호화, 회원가입.카드등록.면허등록이 합쳐서 transaction 실행 후 체크
             $encryptedPw= password_hash($req->pw, PASSWORD_DEFAULT);
             $transactionCheck = registerAccount($req->name, $req->residentNo, $req->gender, $req->phoneNo, $req->id, $encryptedPw,
                 $req->cardNo, $req->cardDate, $req->licenseType, $req->licenseRegion, $req->licenseNo, $req->licenseExpiryDate, $req->licenseDate);
@@ -240,7 +243,7 @@ try {
 
 
 
-        /*
+        /* >> 출력에 시간이 걸린대서 우선 100개로 limit
          * API No. 3
          * API Name : 쏘카존 출력 API
          * 마지막 수정 날짜 : 20.02.21
@@ -315,9 +318,10 @@ try {
             $useTime = $reservationDay.date("H:i", $reservationStartTime)." - ".date("H:i", $reservationEndTime);
             $res->result->useTime= $useTime;
 
-            //배열로 들어온 model값을 변환해서 mysql내 set type으로 전달
+            //배열로 들어온 model값을 변환해서 mysql의 in으로 전달
             if($model != null){
-                $carModelString = '\''.implode('\',\'', $model).'\'';
+                $modelArray = explode(',',$model);
+                $carModelString = '\''.implode('\',\'', $modelArray).'\'';
                 $res->result->socarzone = printSocarzoneByModel(date("Y-m-d H:i:s", $reservationStartTime), date("Y-m-d H:i:s", $reservationEndTime), $carModelString);
             } else {
                 $res->result->socarzone = printSocarzone(date("Y-m-d H:i:s", $reservationStartTime), date("Y-m-d H:i:s", $reservationEndTime));
@@ -809,29 +813,137 @@ try {
 
             if($req->reservationAgreementOne!='Y' | $req->reservationAgreementTwo!='Y' | $req->reservationAgreementThree!='Y' | $req->reservationAgreementFour!='Y'){
                 $res->isSuccess = FALSE;
-                $res->code = 209;
+                $res->code = 202;
                 $res->message = "모든 약관에 모두 동의해야 합니다.";
                 echo json_encode($res, JSON_NUMERIC_CHECK);
                 return;
             }
 
-            //면허 갱신, 입력받은 날짜. 그 시간에 그번호 예약있는지확인!.
+            $data = getDataByJWToken($jwt, JWT_SECRET_KEY);
+            if( json_decode(json_encode(checkLicenseExpiryDate($data->id)))->{'licenseExpiryDate'} < date("Y-m-d")) {
+                $res->isSuccess = FALSE;
+                $res->code = 202;
+                $res->message = "면허를 갱신해야 합니다.";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            }
 
-            //start,endtime가공? 초까지 00으로.,   socarzoneaddres, data->id, carNo, insurance, reservation으로 집어넣기
-            //결제까지 원큐에
+            if( checkReservation($data->id, date("Y-m-d H:i:s", strtotime($req->startTime)), date("Y-m-d H:i:s", strtotime($req->endTime))) ){
+                $res->isSuccess = FALSE;
+                $res->code = 203;
+                $res->message = "이미 예약한 시간대입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            }
+
+            $startTime= $req->startTime;
+            $endTime= $req->endTime;
+            $carNo= $req->carNo;
+
+            //이전 api로부터 가지고 있거나, 입력받도록 변경?
+            $midnight = date("y-m-d", strtotime($endTime)) . " 00:00:00";
+            //이용 시간이 10시간 이하면 요일과 이용 시간으로 요금 계산, 10시간 이상이면 요일과 이용 일수로 요금 계산
+            $useTime = (strtotime($endTime) - strtotime($startTime)) / 60;
+            if ($useTime < 600) {
+                if (floor((strtotime($endTime) - strtotime($startTime)) / 86400) == 0) { // 시작날짜와 끝날짜가 같은지 확인
+                    if (date("w", strtotime($startTime)) == 6 | date("w", strtotime($startTime)) == 0) {
+                        $chargeCriteria = 'weekendTenMinuteCharge';
+                        $finalUseTime = $useTime / 10;
+                    } else {
+                        $chargeCriteria = 'weekdayTenMinuteCharge';
+                        $finalUseTime = $useTime / 10;
+                    }
+                } else { //자정기준으로 시작날짜 시간과 요금(주말,평일), 끝날짜 시간과 요금(주말,평일) 계산
+                    if (date("w", strtotime($startTime)) == 6 | date("w", strtotime($startTime)) == 0) {
+                        $chargeCriteria = 'weekendTenMinuteCharge';
+                        $firstDayUseTime = (strtotime($midnight) - strtotime($startTime)) / 60;
+                    } else {
+                        $chargeCriteria = 'weekdayTenMinuteCharge';
+                        $firstDayUseTime = (strtotime($midnight) - strtotime($startTime)) / 60;
+                    }
+                    if (date("w", strtotime($endTime)) == 6 | date("w", strtotime($endTime)) == 0) {
+                        $chargeCriteria = 'weekendTenMinuteCharge';
+                        $lastDayUseTime = (strtotime($endTime) - strtotime($midnight)) / 60;
+                    } else {
+                        $chargeCriteria = 'weekdayTenMinuteCharge';
+                        $lastDayUseTime = (strtotime($endTime) - strtotime($midnight)) / 60;
+                    }
+                }
+            } else {
+                if (floor((strtotime($endTime) - strtotime($startTime)) / 86400) == 0) {
+                    if (date("w", strtotime($startTime)) == 6 | date("w", strtotime($startTime)) == 0) {
+                        $chargeCriteria = 'weekendCharge';
+                    } else {
+                        $chargeCriteria = 'weekdayCharge';
+                    }
+                    $finalUseTime=1;
+                } else { //이틀 이상일 경우 주말, 평일별 일 수와 요금 계산
+                    $calDate = floor((strtotime($endTime) - strtotime($startTime)) / 86400) - 1;
+                    $startDay = date("w", strtotime($startTime));
+                    if ($startDay == 0) {
+                        $cntSun = floor(($startDay + $calDate) / 7) + 1;
+                    } else {
+                        $cntSun = floor(($startDay + $calDate) / 7);
+                    }
+
+                    if (($startDay + $calDate) % 7 == 6) {
+                        $cntSat = floor(($startDay + $calDate) / 7) + 1;
+                    } else {
+                        $cntSat = floor(($startDay + $calDate) / 7);
+                    }
+
+                    $cntWeekend = $cntSun + $cntSat;
+                    $cntWeekday = $calDate + 1 - $cntWeekend;
+
+                    $totalWeekendCharge = calculationPayment('weekendCharge', $cntWeekend, $carNo);
+                    $totalWeekdayCharge = calculationPayment('weekdayCharge', $cntWeekday, $carNo);
+
+                    $encodedTotalWeekendCharge = json_encode($totalWeekendCharge);
+                    $decodedTotalWeekendCharge = json_decode($encodedTotalWeekendCharge);
+                    $encodedTotalWeekdayCharge = json_encode($totalWeekdayCharge);
+                    $decodedTotalWeekdayCharge = json_decode($encodedTotalWeekdayCharge);
+
+                    $chargeCriteria= $decodedTotalWeekendCharge->{'rentCharge'} + $decodedTotalWeekdayCharge->{'rentCharge'};
+                    $finalUseTime=1;
+
+                    //$decodedTotalCalculationPayment->rentCharge = $decodedTotalWeekendCharge->{'rentCharge'} + $decodedTotalWeekdayCharge->{'rentCharge'};
+                }
+            }
+            $totalCalculationPayment = calculationPayment($chargeCriteria, $finalUseTime, $carNo);
+            $encodedTotalCalculationPayment = json_encode($totalCalculationPayment);
+            $decodedTotalCalculationPayment = json_decode($encodedTotalCalculationPayment);
+
+            $rentCharge= $decodedTotalCalculationPayment->{'rentCharge'};
 
 
+            $insuranceTime= ceil($useTime/720); // 보험 요금은 12시간 단위로 적용
+            $insurance= $req->insurance."Charge";
+            $totalInsuranceCharge = printInsuranceCharge($insurance, $insuranceTime, $carNo);
+
+            $encodedTotalInsuranceCharge = json_encode($totalInsuranceCharge);
+            $decodedTotalInsuranceCharge = json_decode($encodedTotalInsuranceCharge);
+            $insuranceCharge= $decodedTotalInsuranceCharge->{'insuranceCharge'};
 
 
+            //select 감소 용도
+            $userNo= json_decode(json_encode(printUserInfo($data->id)))->{'userNo'};
+            $address= json_decode(json_encode(printCarAddress($req->carNo)))->{'address'};
 
+            $transactionCheck= makeReservation($userNo, $req->carNo, date("Y-m-d H:i:s", strtotime($req->startTime)), date("Y-m-d H:i:s", strtotime($req->endTime)), $req->insurance, $rentCharge, $insuranceCharge, $address);
 
-
-
-            $res->isSuccess = TRUE;
-            $res->code = 100;
-            $res->message = "예약 성공";
-            echo json_encode($res, JSON_NUMERIC_CHECK);
-            break;
+            if( $transactionCheck=='commitComplete') {
+                $res->isSuccess = TRUE;
+                $res->code = 100;
+                $res->message = "예약 성공";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            } else {
+                $res->isSuccess = FALSE;
+                $res->code = 200;
+                $res->message = "예약 실패";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            }
 
 
         /*
@@ -853,6 +965,15 @@ try {
 
             $data = getDataByJWToken($jwt, JWT_SECRET_KEY);
             $printRecentReservation = printRecentReservation($data->id);
+            if( !$printRecentReservation ){
+                $res->isSuccess = FALSE;
+                $res->code = 202;
+                $res->message = "예약이 존재하지 않습니다.";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
+
 
             $res->result = $printRecentReservation;
             $res->result['safetyOption']= explode(',', $res->result['safetyOption']);
@@ -917,7 +1038,6 @@ try {
                 }
             }
 
-
             $res->isSuccess = TRUE;
             $res->code = 100;
             $res->message = "조회 성공";
@@ -926,9 +1046,9 @@ try {
 
 
         /*
-         * API No. 11-1
-         * API Name : 차량 대여 API
-         * 마지막 수정 날짜 : 20.02.17
+         * API No. 11
+         * API Name : 차량 반납 API
+         * 마지막 수정 날짜 : 20.02.26
          */
         case "changeReservationStatus":
             $res->isSuccess = TRUE;
@@ -941,17 +1061,24 @@ try {
         /*
          * API No. 12
          * API Name : 메뉴 API
-         * 마지막 수정 날짜 : 20.02.17
+         * 마지막 수정 날짜 : 20.02.26
          */
         case "printMenu":
+            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
 
+            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "유효하지 않은 토큰입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
 
-
-
-            $res->result->userNo=1;
-            $res->result->name= "김강혁";
-            $res->result->id="abc@abc.com";
-            $res->result->level=1;
+            $data = getDataByJWToken($jwt, JWT_SECRET_KEY);
+            $res->result = printUserInfo($data->id);
+            unset($res->result['phoneNumber']);
+            unset($res->result['profileUrl']);
 
             $res->isSuccess = TRUE;
             $res->code = 100;
@@ -959,33 +1086,26 @@ try {
             echo json_encode($res, JSON_NUMERIC_CHECK);
             break;
 
-        /*
+        /* 12번api와 합칠 수 있도록 같은 함수로 구현
          * API No. 13
          * API Name : 설정 API
-         * 마지막 수정 날짜 : 20.02.17
+         * 마지막 수정 날짜 : 20.02.26
          */
         case "printSetup":
+            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
 
-            $res->result->userNo=1;
-            $res->result->name= "김강혁";
-            $res->result->id="abc@abc.com";
-            $res->result->phoneNumber="010-0000-0000";
-            $res->result->profileUrl=null;
+            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "유효하지 않은 토큰입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
 
-            $res->isSuccess = TRUE;
-            $res->code = 100;
-            $res->message = "조회 성공";
-            echo json_encode($res, JSON_NUMERIC_CHECK);
-            break;
-
-
-        /*
-         * API No. 14-1
-         * API Name : 비밀번호 재설정-아이디 출력 API
-         * 마지막 수정 날짜 : 20.02.17
-         */
-        case "printId":
-            $res->result->id="abc@abc.com";
+            $data = getDataByJWToken($jwt, JWT_SECRET_KEY);
+            $res->result = printUserInfo($data->id);
+            unset($res->result['level']);
 
             $res->isSuccess = TRUE;
             $res->code = 100;
@@ -993,12 +1113,47 @@ try {
             echo json_encode($res, JSON_NUMERIC_CHECK);
             break;
 
+
+
         /*
-         * API No. 14-2
+         * API No. 14
          * API Name : 비밀번호 재설정 API
-         * 마지막 수정 날짜 : 20.02.17
+         * 마지막 수정 날짜 : 20.02.26
          */
         case "changeUserInfo":
+            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
+
+            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "유효하지 않은 토큰입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
+
+            $checkPw = preg_match("/^(?=.*[a-z])(?=.*[0-9])(?=.*[!@#$%^*()\-_=+\\\|\[\]{};:\'\",.<>\/?])*.{8,45}$/i", $req->newPw);
+            if ($checkPw == false) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "비밀번호는 영문, 숫자 포함 8자리 이상 입력해야 합니다.";
+                echo json_encode($res);
+                return;
+            }
+
+            $data = getDataByJWToken($jwt, JWT_SECRET_KEY);
+            $pullEncPw= pullEncPw($data->id);
+            IF( password_verify($req->newPw, $pullEncPw['encryptedPw'])){
+                $res->isSuccess = FALSE;
+                $res->code = 202;
+                $res->message = "기존과 같은 비밀번호입니다.";
+                echo json_encode($res);
+                return;
+            }
+
+            $encryptedPw= password_hash($req->newPw, PASSWORD_DEFAULT);
+            changePw($data->id, $encryptedPw);
+
             $res->isSuccess = TRUE;
             $res->code = 100;
             $res->message = "변경 성공";

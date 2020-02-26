@@ -1,6 +1,21 @@
 <?php
 
 //READ
+function test(){
+
+    $pdo = pdoSqlConnect();
+
+    $query = "select fcmTocken, deviceType from User join (select status, startedAt, userNo from Reservation) Reservation on Reservation.userNo=User.no  where status='rented' and startedAt=date_format(now(),'%Y/%m/%d %H:%i:00');";
+
+    $st = $pdo->prepare($query);
+    $st->execute();
+    $st->setFetchMode(PDO::FETCH_ASSOC);
+    $res = $st->fetchAll();
+
+    $st = null;$pdo = null;
+
+    return $res;
+}
 
 function checkId($id)
 {
@@ -97,7 +112,7 @@ function printSocarzoneByModel($reservationStartTime, $reservationEndTime, $carM
 function checkReservation($id, $reservationStartTime, $reservationEndTime){
     $pdo = pdoSqlConnect();
     $query = "SELECT EXISTS(select * from Reservation join (select no, id from User) User on User.no=Reservation.userNo where User.id=?
-                and (startedAt < ? AND ? < endedAt) OR ( ? < startedAt AND startedAt < ?)) as exist;";
+                and status!='canceled' and ((startedAt < ? AND ? < endedAt) OR ( ? < startedAt AND startedAt < ?)) ) as exist;";
 
     $st = $pdo->prepare($query);
     //    $st->execute([$param,$param]);
@@ -249,10 +264,72 @@ function checkSchedule($startMidnight, $endMidnight, $carNo){
 
 }
 
+
+function checkLicenseExpiryDate($id){
+    $pdo = pdoSqlConnect();
+    $query = "select licenseExpiryDate from License join (select no, id from User) User on User.no=License.userNo where User.id=?;";
+
+    $st = $pdo->prepare($query);
+    //    $st->execute([$param,$param]);
+    $st->execute([$id]);
+    $st->setFetchMode(PDO::FETCH_ASSOC);
+    $res = $st->fetchAll();
+
+    $st=null;$pdo = null;
+
+    return $res[0];
+
+}
+
+
+function printCarAddress($carNo){
+    $pdo = pdoSqlConnect();
+    $query = "select address from Socarzone join (select no, socarzoneNo from Car) Car on Car.socarzoneNo=Socarzone.no where Car.no=?;";
+
+    $st = $pdo->prepare($query);
+    //    $st->execute([$param,$param]);
+    $st->execute([$carNo]);
+    $st->setFetchMode(PDO::FETCH_ASSOC);
+    $res = $st->fetchAll();
+
+    $st=null;$pdo = null;
+
+    return $res[0];
+
+}
+function makeReservation($userNo, $carNo, $startTime, $endTime, $insurance, $rentCharge, $insuranceCharge, $address)
+{
+    $pdo = pdoSqlConnect();
+    try {
+        $pdo->beginTransaction();
+        $query = "INSERT INTO Reservation (userNo, carNo, status, startedAt, endedAt, rentZone, returnZone, insurance) VALUES
+                                            (?, ?, 'reservation', ?, ?, ?, ?, ?);";
+
+        $st = $pdo->prepare($query);
+        $st->execute([$userNo, $carNo, $startTime, $endTime, $address, $address, $insurance]);
+
+        $query = "INSERT INTO Payment (reservationNo, status, rentCharge, insuranceCharge, distanceCharge, couponDiscount) VALUES ((select max(no) from Reservation where userNo=?), 'beforeRent', ?, ?, 0, 0);";
+
+        $st = $pdo->prepare($query);
+        $st->execute([$userNo, $rentCharge, $insuranceCharge]);
+
+        $pdo->commit();
+        $st = null;
+        $pdo = null;
+
+        return 'commitComplete';
+    } catch (PDOException $e) {
+        $pdo->rollback();
+        return $e->getMessage();
+    }
+}
+
+
+
 function printRecentReservation($id){
     $pdo = pdoSqlConnect();
     $query = "select carNo, model, fuelType, safetyOption, convenienceOption, rentZone socarzoneAddress, startedAt startTime, endedAt endTime, status, licensePlateNo from Reservation
-        join (select min(startedAt) min from Reservation where userNo=(select no from User where id=?) and (status='reservation' or status='rented') and current_timestamp < endedAt) Min on Min.min=Reservation.startedAt
+        join (select min(startedAt) min from Reservation where userNo=(select no from User where id=?)  and ((status='reservation' and startedAt > current_timestamp) or status='rented') ) Min on Min.min=Reservation.startedAt
         join (select no, licensePlateNo, modelNo from Car) Car on Car.no=Reservation.carNo
         join (select no, model, fuelType, safetyOption, convenienceOption from CarModel) CarModel on CarModel.no=Car.modelNo;";
 
@@ -267,6 +344,40 @@ function printRecentReservation($id){
     return $res[0];
 
 }
+
+function printUserInfo($id){
+    $pdo = pdoSqlConnect();
+    $query = "select no userNo, name, id, floor(totalDistance/100)+1 level, phoneNo phoneNumber, profileUrl from User where id=?;";
+
+    $st = $pdo->prepare($query);
+    //    $st->execute([$param,$param]);
+    $st->execute([$id]);
+    $st->setFetchMode(PDO::FETCH_ASSOC);
+    $res = $st->fetchAll();
+
+    $st=null;$pdo = null;
+
+    return $res[0];
+
+}
+
+function changePw($id, $encryptedPw)
+{
+    $pdo = pdoSqlConnect();
+    $query = "update User set encryptedPw=? where id=?;";
+
+    $st = $pdo->prepare($query);
+    $st->execute([$encryptedPw, $id]);
+    //    $st->execute();
+    $st->setFetchMode(PDO::FETCH_ASSOC);
+    //$res = $st->fetchAll();
+
+    $st = null;
+    $pdo = null;
+
+    //return $res[0];
+}
+
 
 
 
