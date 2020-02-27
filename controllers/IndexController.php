@@ -31,8 +31,12 @@ try {
             http_response_code(200);
 
 
-//            $idx = $_GET["idx"];
-//            test($idx);
+            $idx = $_GET["idx"];
+            //test($idx);
+
+            if( $idx='hi'){
+                echo hi;
+            }
 
 //               $test= test();
 //            $fcmRes = json_decode(json_encode($test));
@@ -428,7 +432,9 @@ try {
                 }
             }
 
-            $res->result->startTime= $reservationDay. date("H:i", strtotime($startTime));
+            //클라이언트 요청으로 시작 시간 삭제
+            //$res->result->startTime= $reservationDay. date("H:i", strtotime($startTime));
+
             //date("Y-m-d H:i:s", $reservationStartTime), date("Y-m-d H:i:s", $reservationEndTime);
 
             $carList =printCars($vars['socarzoneNo']);
@@ -534,9 +540,10 @@ try {
                 }
 
                 $checkSchedule = (checkSchedule($startMidnight, $endMidnight, $carNo));
-                if($checkSchedule!=null ) {
-                    $res->result->carList[$i]['schedule'] = $checkSchedule;
-                }
+//                클라이언트 요청으로 개발 시 스케쥴 생략
+//                if($checkSchedule!=null ) {
+//                    $res->result->carList[$i]['schedule'] = $checkSchedule;
+//                }
 
 
             }
@@ -828,17 +835,42 @@ try {
                 return;
             }
 
-            if( checkReservation($data->id, date("Y-m-d H:i:s", strtotime($req->startTime)), date("Y-m-d H:i:s", strtotime($req->endTime))) ){
+            $startTime= $req->startTime;
+            $endTime= $req->endTime;
+            $carNo= $req->carNo;
+
+            //시작, 끝 시간이 올바르게 입력됐을 시, 시작 시간이 현재 시간보다 뒤이며 시작,끝 시간이 30분 이상 차이나는지 검사 후 이용 시간으로 설정 + 끝 시간이 시작 시간으로부터 14일 초과 여부 검사
+            $checkStartTime = preg_match("/^(?:[0-9]{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[1,2][0-9]|3[0,1])\s(?:[0-1][0-9]|2[0-3])\:([0-5]0))$/", $startTime);
+            $checkEndTime = preg_match("/^(?:[0-9]{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[1,2][0-9]|3[0,1])(\s?)(?:[0-1][0-9]|2[0-3])\:([0-5]0))$/", $endTime);
+            $afterThirtyFromStart = date("y-m-d H:i", strtotime($startTime."+30 minute"));
+            $afterFourteenFromStart = date("y-m-d H:i", strtotime($startTime."+14 day"));
+            if(!($startTime!=null & $endTime!=null & $checkStartTime==true & $checkEndTime==true & date("y-m-d H:i") <  date("y-m-d H:i", strtotime($startTime))
+                & $afterThirtyFromStart <= date("y-m-d H:i", strtotime($endTime)) & date("y-m-d H:i", strtotime($endTime)) < $afterFourteenFromStart) ){
                 $res->isSuccess = FALSE;
                 $res->code = 203;
+                $res->message = "예약 불가능한 시간입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            }
+
+            if( checkReservation($data->id, date("Y-m-d H:i:s", strtotime($req->startTime)), date("Y-m-d H:i:s", strtotime($req->endTime))) ){
+                $res->isSuccess = FALSE;
+                $res->code = 204;
                 $res->message = "이미 예약한 시간대입니다";
                 echo json_encode($res, JSON_NUMERIC_CHECK);
                 return;
             }
 
-            $startTime= $req->startTime;
-            $endTime= $req->endTime;
-            $carNo= $req->carNo;
+            if( $req->insurance != 'light' & $req->insurance != 'standard' & $req->insurance != 'special' ){
+                $res->isSuccess = FALSE;
+                $res->code = 205;
+                $res->message = "보험이 올바르지 않습니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            }
+
+
+
 
             //이전 api로부터 가지고 있거나, 입력받도록 변경?
             $midnight = date("y-m-d", strtotime($endTime)) . " 00:00:00";
@@ -1047,13 +1079,75 @@ try {
 
         /*
          * API No. 11
-         * API Name : 차량 반납 API
-         * 마지막 수정 날짜 : 20.02.26
+         * API Name : 차량 반납 및 추가 결제 API
+         * 마지막 수정 날짜 : 20.02.27
          */
         case "changeReservationStatus":
+            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
+
+            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "유효하지 않은 토큰입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
+
+            if($req->returnZone!='Y' | $req->windowCheck!='Y' | $req->lightCheck!='Y' | $req->belongingCheck!='Y'){
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "반납 전 확인 사항을 체크해야 합니다.";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            }
+
+            $data = getDataByJWToken($jwt, JWT_SECRET_KEY);
+
+            //거리에 따른 요금 계산
+            $printDistanceCharge= printDistanceCharge($data->id);
+            $encodedDistanceCharge = json_encode($printDistanceCharge, JSON_NUMERIC_CHECK);
+            $decodedDistanceCharge = json_decode( $encodedDistanceCharge,JSON_NUMERIC_CHECK);
+
+            if( $req->dinstance<= 30){
+                $distanceCharge= $req->distance*$decodedDistanceCharge['distanceOneCharge'];
+            } else if (  $req->dinstance<= 100) {
+                $distanceCharge= $req->distance*$decodedDistanceCharge['distanceTwoCharge'];
+            } else {
+                $distanceCharge= $req->distance*$decodedDistanceCharge['distanceThreeCharge'];
+            }
+            $userNo = $decodedDistanceCharge['userNo'];
+            $carNo = $decodedDistanceCharge['carNo'];
+            $reservationNo = $decodedDistanceCharge['reservationNo'];
+
+            if( $decodedDistanceCharge['status']=='rented'){
+                $transactionCheck = returnSocar($req->distance, $distanceCharge, $userNo, $carNo, $reservationNo );
+            } else {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "대여된 상태가 아닙니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            }
+
+            if( $transactionCheck=='commitComplete') {
+                $res->isSuccess = TRUE;
+                $res->code = 100;
+                $res->message = "반납 성공";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            } else {
+                $res->isSuccess = FALSE;
+                $res->code = 200;
+                $res->message = "반납 실패";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            }
+
+
             $res->isSuccess = TRUE;
             $res->code = 100;
-            $res->message = "대여 성공";
+            $res->message = "반납 성공";
             echo json_encode($res, JSON_NUMERIC_CHECK);
             break;
 
@@ -1115,7 +1209,7 @@ try {
 
 
 
-        /*
+        /* 본인인증 대신 pw 입력 검토
          * API No. 14
          * API Name : 비밀번호 재설정 API
          * 마지막 수정 날짜 : 20.02.26

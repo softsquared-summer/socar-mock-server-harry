@@ -345,6 +345,66 @@ function printRecentReservation($id){
 
 }
 
+function printDistanceCharge($id){
+    $pdo = pdoSqlConnect();
+    $query = "select distanceOneCharge, distanceTwoCharge, distanceThreeCharge, User.no userNo, Car.no carNo, Reservation.no reservationNo, Reservation.status status from Charge
+            join (select modelNo, no from Car) Car on Car.modelNo=Charge.carModelNo
+            join (select no, carNo, userNo, status, startedAt from Reservation) Reservation on Reservation.carNo=Car.no
+            join (select no, id from User) User on User.no=Reservation.userNo
+            join (select min(startedAt) min from Reservation where userNo=(select no from User where id=?) and status='rented') Min on Min.min=Reservation.startedAt
+            where id=? and status='rented';";
+
+    $st = $pdo->prepare($query);
+    //    $st->execute([$param,$param]);
+    $st->execute([$id, $id]);
+    $st->setFetchMode(PDO::FETCH_ASSOC);
+    $res = $st->fetchAll();
+
+    $st=null;$pdo = null;
+
+    return $res[0];
+
+}
+
+
+
+function returnSocar($distance, $distanceCharge, $userNo, $carNo, $reservationNo)
+{
+    $pdo = pdoSqlConnect();
+    try {
+        $pdo->beginTransaction();
+
+        $query = "update Reservation set status='returned', returnedAt=current_timestamp, distance=distance+? where no=?;";
+        $st = $pdo->prepare($query);
+        $st->execute([$distance, $reservationNo]);
+
+        $query = "update User set totalDistance=totalDistance+? where no=?;";
+
+        $st = $pdo->prepare($query);
+        $st->execute([$distance, $userNo]);
+
+        $query = "update Car set totalDistance=totalDistance+? where no=?;";
+
+        $st = $pdo->prepare($query);
+        $st->execute([$distance, $carNo]);
+
+        $query = "update Payment set status='afterRent', distanceCharge=? where reservationNo=?;";
+
+        $st = $pdo->prepare($query);
+        $st->execute([ $distanceCharge, $reservationNo]);
+
+        $pdo->commit();
+        $st = null;
+        $pdo = null;
+
+        return 'commitComplete';
+    } catch (PDOException $e) {
+        $pdo->rollback();
+        return $e->getMessage();
+    }
+}
+
+
 function printUserInfo($id){
     $pdo = pdoSqlConnect();
     $query = "select no userNo, name, id, floor(totalDistance/100)+1 level, phoneNo phoneNumber, profileUrl from User where id=?;";
@@ -377,6 +437,8 @@ function changePw($id, $encryptedPw)
 
     //return $res[0];
 }
+
+
 
 
 
