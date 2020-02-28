@@ -34,7 +34,7 @@ for($i=0;;$i++){
     if(!$fcmRes[$i]->{'fcmToken'}){
         break;
     }
-    //sendFcm($fcmRes[$i]->{'fcmToken'});
+    sendFcm($fcmRes[$i]->{'fcmToken'});
 }
 
 //return $res;
