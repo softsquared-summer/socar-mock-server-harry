@@ -438,10 +438,174 @@ function changePw($id, $encryptedPw)
     //return $res[0];
 }
 
+function printReservationStatus($reservationNo){
+    $pdo = pdoSqlConnect();
+    $query = "select status from Reservation where no=?;";
+
+    $st = $pdo->prepare($query);
+    //    $st->execute([$param,$param]);
+    $st->execute([$reservationNo]);
+    $st->setFetchMode(PDO::FETCH_ASSOC);
+    $res = $st->fetchAll();
+
+    $st=null;$pdo = null;
+
+    return $res[0];
+
+}
+
+function cancelReservation($reservationNo)
+{
+    $pdo = pdoSqlConnect();
+    try {
+        $pdo->beginTransaction();
+
+        $query = "update Reservation set status='canceled' where no=?;";
+        $st = $pdo->prepare($query);
+        $st->execute([$reservationNo]);
+
+        $query = "update Payment set status='canceled' where reservationNo=?;";
+
+        $st = $pdo->prepare($query);
+        $st->execute([$reservationNo]);
+
+        $pdo->commit();
+        $st = null;
+        $pdo = null;
+
+        return 'commitComplete';
+    } catch (PDOException $e) {
+        $pdo->rollback();
+        return $e->getMessage();
+    }
+}
+
+function printUsageHistory($id, $status){
+    $pdo = pdoSqlConnect();
+    $query = "select Reservation.no reservationNo, status, CarModel.profileUrl profileUrl, licensePlateNo plateNo, model, address, startedAt, endedAt, concat(distance,'km') driveDistance from User
+                join (select no, userNo, status, carNo, startedAt, endedAt, distance from Reservation) Reservation on Reservation.userNo=User.no
+                join (select no, modelNo, licensePlateNo, socarzoneNo from Car) Car on Car.no=Reservation.carNo
+                join (select no, profileUrl, model from CarModel) CarModel on CarModel.no=Car.modelNo
+                join (select no, address from Socarzone) Socarzone on Socarzone.no=Car.socarzoneNo
+                where User.id=? and status!=? order by startedAt;";
+
+    $st = $pdo->prepare($query);
+    //    $st->execute([$param,$param]);
+    $st->execute([$id, $status]);
+    $st->setFetchMode(PDO::FETCH_ASSOC);
+    $res = $st->fetchAll();
+
+    $st=null;$pdo = null;
+
+    return $res;
+
+}
+
+function printRentInfo($reservationNo){
+    $pdo = pdoSqlConnect();
+    $query = "select Reservation.no reservationNo, Car.no carNo, status, model, licensePlateNo, fuelType, safetyOption, convenienceOption, insurance, fellowPassenger, startedAt, endedAt, distanceOneCharge, distanceThreeCharge, address from Reservation
+                join (select no, licensePlateNo, modelNo, socarzoneNo from Car) Car on Car.no=Reservation.carNo
+                join (select no, model, fuelType, safetyOption, convenienceOption from CarModel) CarModel on CarModel.no=Car.modelNo
+                join (select carModelNo, distanceOneCharge, distanceThreeCharge from Charge) Charge on Charge.carModelNo=CarModel.no
+                join (select no, address from Socarzone) Socarzone on Socarzone.no=Car.socarzoneNo
+                where Reservation.no=?;";
+
+    $st = $pdo->prepare($query);
+    //    $st->execute([$param,$param]);
+    $st->execute([$reservationNo]);
+    $st->setFetchMode(PDO::FETCH_ASSOC);
+    $res = $st->fetchAll();
+
+    $st=null;$pdo = null;
+
+    return $res[0];
+
+}
+
+function printPaymentInfo($reservationNo){
+    $pdo = pdoSqlConnect();
+    $query = "select Payment.reservationNo reservationNo, status, model, concat(format((rentCharge+insuranceCharge+distanceCharge),0),'원') totalCharge, concat(format((rentCharge+insuranceCharge),0),'원') beforeCharge,
+       concat(format(rentCharge,0),'원') rentCharge, concat(format(insuranceCharge,0),'원') insuranceCharge, concat(format(distanceCharge,0),'원') afterCharge, concat(distanceThreeCharge,'~',distanceoneCharge,'원/km') distanceCharge from Payment
+        join (select no, carNo from Reservation) Reservation on Reservation.no=Payment.reservationNo
+        join (select no, modelNo from Car) Car on Car.no=Reservation.carNo
+        join (select no, model from CarModel) CarModel on CarModel.no=Car.modelNo
+        join (select carModelNo, distanceThreeCharge, distanceOneCharge from Charge) Charge on Charge.carModelNo=CarModel.no
+        where Payment.reservationNo=?;";
+
+    $st = $pdo->prepare($query);
+    //    $st->execute([$param,$param]);
+    $st->execute([$reservationNo]);
+    $st->setFetchMode(PDO::FETCH_ASSOC);
+    $res = $st->fetchAll();
+
+    $st=null;$pdo = null;
+
+    return $res[0];
+
+}
+
+function checkWithdrawal($id){
+    $pdo = pdoSqlConnect();
+    $query = "SELECT isDeleted from User where id=?;";
 
 
+    $st = $pdo->prepare($query);
+    //    $st->execute([$param,$param]);
+    $st->execute([$id]);
+    $st->setFetchMode(PDO::FETCH_ASSOC);
+    $res = $st->fetchAll();
+
+    $st=null;$pdo = null;
+
+    return $res[0];
+
+}
+
+function withdrawal($id)
+{
+    $pdo = pdoSqlConnect();
+    $query = "update User set isDeleted='Y' where id=?;";
+
+    $st = $pdo->prepare($query);
+    $st->execute([$id]);
+    //    $st->execute();
+    $st->setFetchMode(PDO::FETCH_ASSOC);
+    //$res = $st->fetchAll();
+
+    $st = null;
+    $pdo = null;
+
+    //return $res[0];
+}
+
+function checkFellowPassenger($reservationNo){
+    $pdo = pdoSqlConnect();
+    $query = "SELECT fellowPassenger from Reservation where no=?;";
 
 
+    $st = $pdo->prepare($query);
+    //    $st->execute([$param,$param]);
+    $st->execute([$reservationNo]);
+    $st->setFetchMode(PDO::FETCH_ASSOC);
+    $res = $st->fetchAll();
+
+    $st=null;$pdo = null;
+
+    return $res[0];
+
+}
+
+function addFellowPassenger($FellowPassenger, $reservationNo){
+    $pdo = pdoSqlConnect();
+    $query = "UPDATE Reservation SET fellowPassenger = ? WHERE no = ?";
+
+    $st = $pdo->prepare($query);
+    $st->execute([$FellowPassenger, $reservationNo]);
+
+    $st = null;
+    $pdo = null;
+
+}
 
 
 

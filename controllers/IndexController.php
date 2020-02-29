@@ -31,12 +31,15 @@ try {
             http_response_code(200);
 
 
-            $idx = $_GET["idx"];
-            //test($idx);
+//            $idx = $_GET["idx"];
+//            test($idx);
+//
+//            if( $idx='hi'){
+//                echo hi;
+//            }
 
-            if( $idx='hi'){
-                echo hi;
-            }
+            $test =sendFCM('d6DvQXqrVJc:APA91bFUL1iYVCY-k8Cr18WJ40GoqPw-EJJ0Vra8owhxNVuvJF-S2j6YRk8vb7iKju74LGaAII_ml40OQMLzhMpcZF2iPE58nEpNaezATBmffjT6WlKNK-fMtHwKdaA6OLJzGlIOjZ9O');
+//        echo json_encode($test);
 
 //               $test= test();
 //            $fcmRes = json_decode(json_encode($test));
@@ -107,8 +110,8 @@ try {
                 return;
             }
 
-            $checkId = preg_match("/^[_\.0-9a-zA-Z-]+@([0-9a-zA-Z][0-9a-zA-Z-]+\.)+[a-zA-Z]{2,6}$/i", $req->id);
-            if ($checkId == false) {
+            $checkMail = preg_match("/^[_\.0-9a-zA-Z-]+@([0-9a-zA-Z][0-9a-zA-Z-]+\.)+[a-zA-Z]{2,6}$/i", $req->id);
+            if ($checkMail == false) {
                 $res->isSuccess = FALSE;
                 $res->code = 204;
                 $res->message = "아이디(이메일) 형식이 올바르지 않습니다.";
@@ -358,7 +361,7 @@ try {
                 return;
             }
 
-            $res->result->adress= json_decode(json_encode(printSocarzoneAddress($vars['socarzoneNo'])))->{'address'};
+            $res->result->socarzoneAddress= json_decode(json_encode(printSocarzoneAddress($vars['socarzoneNo'])))->{'address'};
 
             //default 시간. 3번 api에서 최종 시간 출력한 후 가져오면 삭제해도 됨
             $reservationDay= "오늘 ";
@@ -1030,7 +1033,7 @@ try {
             $endTime=$res->result['endTime'];
 
             $res->result['startTime']= $reservationDay.date("H:i", strtotime($res->result['startTime']))." 부터";
-            $res->result['endTime']= $reservationDay.date("H:i", strtotime($res->result['endTime']));
+            $res->result['endTime']= $reservationEndDay.date("H:i", strtotime($res->result['endTime']));
 
 
             $status= json_decode(json_encode($printRecentReservation))->{'status'};
@@ -1054,7 +1057,7 @@ try {
                         if ($useMinute != 0) {
                             $res->result['useTime'] = "이용시간 " . $useDay . "일 " . $useMinute . "분 " . "남음";
                         } else {
-                            $res->result['useTime'] = "이용시간 " . $useDay . "일 " . "이용";
+                            $res->result['useTime'] = "이용시간 " . $useDay . "일 " . "남음";
                         }
                     }
                 } else {
@@ -1257,29 +1260,94 @@ try {
 
         /*
          * API No. 15
-         * API Name : 이용내역 API
-         * 마지막 수정 날짜 : 20.02.17
+         * API Name : 이용내역 조회 API
+         * 마지막 수정 날짜 : 20.02.18
          */
         case "printReservationList":
+            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
 
-            $res->result[0]->reservationNo =1;
-            $res->result[0]->status="reservation";
-            $res->result[0]->profileUrl=null;
-            $res->result[0]->model = "올뉴모닝";
-            $res->result[0]->rentAddress="문화공영주차장";
-            $res->result[0]->returnAddress="문화공영주차장";
-            $res->result[0]->reservationTime="2/18 (화) 15:00-15:30";
-            $res->result[0]->leftTime=="쏘카 이용 2일 21시간 29분 전";
+            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "유효하지 않은 토큰입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
 
-            $res->result[1]->reservationNo =2;
-            $res->result[1]->status="returned";
-            $res->result[1]->profileUrl=null;
-            $res->result[1]->plateNo= "69호9902";
-            $res->result[1]->model = "아반떼AD";
-            $res->result[1]->rentAddress="테크노프라자 주차장";
-            $res->result[1]->returnAddress="테크노프라자 주차장";
-            $res->result[1]->reservationTime="4/16 (월) 18:40-19:40";
-            $res->result[1]->driveDistance="33km";
+            $hideCanceled = $_GET["hideCanceled"];
+            if($hideCanceled !='Y'){
+                $status='nothing';
+            } else {
+                $status='canceled';
+            }
+
+            $data = getDataByJWToken($jwt, JWT_SECRET_KEY);
+            $printUsageHistory = printUsageHistory($data->id, $status);
+            $res->result = $printUsageHistory;
+            $encodedRes= json_encode($printUsageHistory);
+            $decodedRes= json_decode($encodedRes);
+
+            $day = array("일","월","화","수","목","금","토");
+            for($i=0;;$i++){
+                if(!$res->result[$i]){
+                    break;
+                }
+                $res->result[$i]['rentAddress']= $decodedRes[$i]->{'address'};
+                $res->result[$i]['returnAddress']= $decodedRes[$i]->{'address'};
+
+                $reservationDay= date("m/d", strtotime($decodedRes[$i]->{'startedAt'}))." (".$day[date('w', strtotime($decodedRes[$i]->{'startedAt'}))].") ";
+                $reservationEndDay= date("m/d", strtotime($decodedRes[$i]->{'endedAt'}))." (".$day[date('w', strtotime($decodedRes[$i]->{'endedAt'}))].") ";
+                if ( date("m/d", strtotime($decodedRes[$i]->{'startedAt'}))!=date("m/d", strtotime($decodedRes[$i]->{'endedAt'}))){
+                    $reservationTime = $reservationDay.date("H:i", strtotime($decodedRes[$i]->{'startedAt'}))." - ".$reservationEndDay.date("H:i", strtotime($decodedRes[$i]->{'endedAt'}));
+                } else {
+                    $reservationTime = $reservationDay.date("H:i", strtotime($decodedRes[$i]->{'startedAt'}))." - ".date("H:i", strtotime($decodedRes[$i]->{'endedAt'}));
+                }
+                $res->result[$i]['resevationTime']= $reservationTime;
+
+                $useTime = floor((strtotime($decodedRes[$i]->{'startedAt'})-strtotime(date("Y-m-d H:i:s")))/60);
+                $useDay=floor($useTime/1440);
+                $useHour=floor(($useTime%1440)/60);
+                $useMinute=floor(($useTime%1440)/60);
+
+                if($decodedRes[$i]->{'status'}=='reservation' & $useTime>0) {
+                    if ($useDay != 0) {
+                        if ($useHour != 0) {
+                            if ($useMinute != 0) {
+                                $leftTime = "쏘카 이용 " . $useDay . "일 " . $useHour . "시간 " . $useMinute . "분 " . "전";
+                            } else {
+                                $leftTime = "쏘카 이용 " . $useDay . "일 " . $useHour . "시간 " . "전";
+                            }
+                        } else {
+                            if ($useMinute != 0) {
+                                $leftTime = "쏘카 이용 " . $useDay . "일 " . $useMinute . "분 " . "전";
+                            } else {
+                                $leftTime = "쏘카 이용 " . $useDay . "일 " . "전";
+                            }
+                        }
+                    } else {
+                        if ($useHour != 0) {
+                            if ($useMinute != 0) {
+                                $leftTime = "쏘카 이용 " . $useHour . "시간 " . $useMinute . "분 " . "전";
+                            } else {
+                                $leftTime = "쏘카 이용 " . $useHour . "시간 " . "전";
+                            }
+                        } else {
+                            $leftTime = "쏘카 이용 " . $useMinute . "분 " . "전";
+                        }
+                    }
+
+                    $res->result[$i]['leftTime'] = $leftTime;
+                }
+
+                if($decodedRes[$i]->{'status'}!='returned') {
+                    unset($res->result[$i]['driveDistance']);
+                }
+
+                unset($res->result[$i]['address']);
+                unset($res->result[$i]['startedAt']);
+                unset($res->result[$i]['endedAt']);
+            }
 
             $res->isSuccess = TRUE;
             $res->code = 100;
@@ -1290,26 +1358,93 @@ try {
 
         /*
         * API No. 16
-        * API Name : 대여정보 API
-        * 마지막 수정 날짜 : 20.02.17
+        * API Name : 대여정보 조회 API
+        * 마지막 수정 날짜 : 20.02.18
         */
         case "printReservationInfo":
+            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
 
-            $res->result->reservationNo =1;
-            $res->result->status="reservation";
-            $res->result->model = "올뉴모닝";
-            $res->result->useTime="2/18 (화) 15:00-02/17 (월) 15:20";
-            $res->result->fuelType= "휘발유";
-            $res->result->safetyOption[0]="에어백";
-            $res->result->safetyOption[1]="후방감지센서";
-            $res->result->safetyOption[2]="블랙박스";
-            $res->result->safetyOption[3]="네비게이션";
-            $res->result->convenienceOption[0]="에어컨";
-            $res->result->convenienceOption[1]="열선시트";
-            $res->result->distanceCharge="190~140원/km";
-            $res->result->rentAddress="문화공영주차장";
-            $res->result->returnAddress="문화공영주차장";
-            $res->result->insurace="라이트";
+            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "유효하지 않은 토큰입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
+
+            $printRentInfo = printRentInfo($vars["reservationNo"]);
+            $res->result = $printRentInfo;
+            $encodedRes= json_encode($printRentInfo);
+            $decodedRes= json_decode($encodedRes);
+
+            if($decodedRes->{'status'}!='rented' & $decodedRes->{'status'}!='returned') {
+                unset($res->result['licensePlateNo']);
+            }
+            if($decodedRes->{'fellowPassenger'}==null) {
+                unset($res->result['fellowPassenger']);
+            }
+
+            $res->result['safetyOption']= explode(',', $res->result['safetyOption']);
+            $res->result['convenienceOption']= explode(',', $res->result['convenienceOption']);
+
+            $res->result['distanceCharge']= $decodedRes->{'distanceThreeCharge'}."~".$decodedRes->{'distanceOneCharge'}."원/km";
+            unset($res->result['distanceThreeCharge']);
+            unset($res->result['distanceOneCharge']);
+
+            $res->result['rentAddress']= $decodedRes->{'address'};
+            $res->result['returnAddress']= $decodedRes->{'address'};
+            unset($res->result['address']);
+
+            if($decodedRes->{'insurance'}=='light') {
+                $res->result['insurance']= '라이트';
+            } else if ($decodedRes->{'insurance'}=='standard') {
+                $res->result['insurance']= '스탠다드';
+            } else if ($decodedRes->{'insurance'}=='special') {
+                $res->result['insurance']= '스페셜';
+            }
+
+            $day = array("일","월","화","수","목","금","토");
+            $reservationDay= date("m/d", strtotime($decodedRes->{'startedAt'}))." (".$day[date('w', strtotime($decodedRes->{'startedAt'}))].") ";
+            $reservationEndDay= date("m/d", strtotime($decodedRes->{'endedAt'}))." (".$day[date('w', strtotime($decodedRes->{'endedAt'}))].") ";
+            if ( date("m/d", strtotime($decodedRes->{'startedAt'}))!=date("m/d", strtotime($decodedRes->{'endedAt'}))){
+                $reservationTime = $reservationDay.date("H:i", strtotime($decodedRes->{'startedAt'}))." - ".$reservationEndDay.date("H:i", strtotime($decodedRes->{'endedAt'}));
+            } else {
+                $reservationTime = $reservationDay.date("H:i", strtotime($decodedRes->{'startedAt'}))." - ".date("H:i", strtotime($decodedRes->{'endedAt'}));
+            }
+            $res->result['resevationTime']= $reservationTime;
+
+            $useTime = floor((strtotime($decodedRes->{'endedAt'})-strtotime($decodedRes->{'startedAt'}))/60);
+            $useDay=floor($useTime/1440);
+            $useHour=floor(($useTime%1440)/60);
+            $useMinute=floor(($useTime%1440)/60);
+
+            if ($useDay != 0) {
+                if ($useHour != 0) {
+                    if ($useMinute != 0) {
+                        $leftTime = "총 " . $useDay . "일 " . $useHour . "시간 " . $useMinute . "분 " . "이용";
+                    } else {
+                        $leftTime = "총 " . $useDay . "일 " . $useHour . "시간 " . "이용";
+                    }
+                } else {
+                    if ($useMinute != 0) {
+                        $leftTime = "총 " . $useDay . "일 " . $useMinute . "분 " . "이용";
+                    } else {
+                        $leftTime = "총 " . $useDay . "일 " . "이용";
+                    }
+                }
+            } else {
+                if ($useHour != 0) {
+                    if ($useMinute != 0) {
+                        $leftTime = "총 " . $useHour . "시간 " . $useMinute . "분 " . "이용";
+                    } else {
+                        $leftTime = "총 " . $useHour . "시간 " . "이용";
+                    }
+                } else {
+                    $leftTime = "총 " . $useMinute . "분 " . "이용";
+                }
+            }
+            $res->result['leftTime'] = $leftTime;
 
             $res->isSuccess = TRUE;
             $res->code = 100;
@@ -1320,39 +1455,189 @@ try {
 
         /*
          * API No. 17
-         * API Name : 예약 취소 API
-         * 마지막 수정 날짜 : 20.02.17
+         * API Name : 예약 및 결제 취소 API
+         * 마지막 수정 날짜 : 20.02.28
          */
         case "cancelReservation":
-            $res->isSuccess = TRUE;
-            $res->code = 100;
-            $res->message = "취소 성공";
-            echo json_encode($res, JSON_NUMERIC_CHECK);
+            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
+
+            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "유효하지 않은 토큰입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
+
+            if( json_decode(json_encode(printReservationStatus($vars["reservationNo"])))->{'status'} =='reservation'){
+                cancelReservation($vars["reservationNo"]);
+                if( json_decode(json_encode(printReservationStatus($vars["reservationNo"])))->{'status'} =='canceled') {
+                    $res->isSuccess = TRUE;
+                    $res->code = 100;
+                    $res->message = "취소 성공";
+                    echo json_encode($res, JSON_NUMERIC_CHECK);
+                    return;
+                } else {
+                    $res->isSuccess = FALSE;
+                    $res->code = 200;
+                    $res->message = "취소 실패";
+                    echo json_encode($res, JSON_NUMERIC_CHECK);
+                }
+            } else {
+                $res->isSuccess = FALSE;
+                $res->code = 202;
+                $res->message = "예약된 상태가 아닙니다.";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            }
+
             break;
 
 
         /*
          * API No. 18
-         * API Name : 결제내역 API
-         * 마지막 수정 날짜 : 20.02.17
+         * API Name : 결제내역 조회 API
+         * 마지막 수정 날짜 : 20.02.28
          */
         case "printPaymentInfo":
+            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
 
-            $res->result->reservationNo =1;
-            $res->result->status="reservation";
-            $res->result->model = "아반떼AD";
-            $res->result->totalCharge="980원";
-            $res->result->beforeCharge="260원";
-            $res->result->rentCharge="130원";
-            $res->result->insuranceCharge="130원";
-            $res->result->afterCharge="720원";
-            $res->result->distanceCharge="190~140원/km";
+            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "유효하지 않은 토큰입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
+
+            $printPaymentInfo = printPaymentInfo($vars["reservationNo"]);
+            $res->result = $printPaymentInfo;
+            $encodedRes= json_encode($printPaymentInfo);
+            $decodedRes= json_decode($encodedRes);
+
+            if($decodedRes->{'status'}!='returned') {
+                unset($res->result['afterCharge']);
+            }
 
             $res->isSuccess = TRUE;
             $res->code = 100;
             $res->message = "조회 성공";
             echo json_encode($res, JSON_NUMERIC_CHECK);
             break;
+
+        /*
+        * API No. 19
+        * API Name : 회원 탈퇴 API
+        * 마지막 수정 날짜 : 20.02.28
+        */
+        case "withdrawal":
+            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
+
+            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "유효하지 않은 토큰입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
+
+            $data = getDataByJWToken($jwt, JWT_SECRET_KEY);
+            $checkWithdrawal = checkWithdrawal($data->id);
+            $encodedRes= json_encode($checkWithdrawal);
+            $decodedRes= json_decode($encodedRes);
+
+            if($decodedRes->{'isDeleted'}!='Y') {
+                withdrawal($data->id);
+                $res->isSuccess = TRUE;
+                $res->code = 100;
+                $res->message = "탈퇴 성공";
+            } else {
+                $res->isSuccess = FALSE;
+                $res->code = 200;
+                $res->message = "이미 탈퇴된 회원입니다.";
+            }
+
+            echo json_encode($res, JSON_NUMERIC_CHECK);
+            break;
+
+        /*
+        * API No. 20
+        * API Name : 동승자 추가 API
+        * 마지막 수정 날짜 : 20.02.28
+        */
+        case "addFellowPassenger":
+            $jwt = $_SERVER["HTTP_X_ACCESS_TOKEN"];
+
+            if (!isValidHeader($jwt, JWT_SECRET_KEY)) {
+                $res->isSuccess = FALSE;
+                $res->code = 201;
+                $res->message = "유효하지 않은 토큰입니다";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                addErrorLogs($errorLogs, $res, $req);
+                return;
+            }
+
+            $checkMail = preg_match("/^[_\.0-9a-zA-Z-]+@([0-9a-zA-Z][0-9a-zA-Z-]+\.)+[a-zA-Z]{2,6}$/i", $req->fellowPassenger);
+            if ($checkMail == false) {
+                $res->isSuccess = FALSE;
+                $res->code = 202;
+                $res->message = "아이디(이메일) 형식이 올바르지 않습니다.";
+                echo json_encode($res);
+                return;
+            }
+
+            $data = getDataByJWToken($jwt, JWT_SECRET_KEY);
+            if ($req->fellowPassenger==$data->id) {
+                $res->isSuccess = FALSE;
+                $res->code = 203;
+                $res->message = "자신은 추가할 수 없습니다.";
+                echo json_encode($res);
+                return;
+            }
+
+            $checkId = checkId($req->fellowPassenger);
+            if (!$checkId) {
+                $res->isSuccess = FALSE;
+                $res->code = 204;
+                $res->message = "존재하지 않는 회원입니다.";
+                echo json_encode($res);
+                return;
+            }
+
+            $checkFellowPassenger = checkFellowPassenger($vars["reservationNo"]);
+            $encodedRes= json_encode($checkFellowPassenger);
+            $decodedRes= json_decode($encodedRes);
+
+            if(!$decodedRes->{'fellowPassenger'}) {
+                $addFellowPassenger = addFellowPassenger($req->fellowPassenger, $vars["reservationNo"]);
+                $checkFellowPassenger = checkFellowPassenger($vars["reservationNo"]);
+                $encodedRes= json_encode($checkFellowPassenger);
+                $decodedRes= json_decode($encodedRes);
+                if(!$decodedRes->{'fellowPassenger'}) {
+                    $res->isSuccess = FALSE;
+                    $res->code = 200;
+                    $res->message = "추가 실패";
+                } else {
+                    $res->isSuccess = TRUE;
+                    $res->code = 100;
+                    $res->message = "추가 성공";
+                }
+            } else {
+                $res->isSuccess = FALSE;
+                $res->code = 205;
+                $res->message = "이미 추가된 동승자가 있습니다.";
+                echo json_encode($res);
+                return;
+            }
+
+            echo json_encode($res, JSON_NUMERIC_CHECK);
+            break;
+
+
+
 
 
     }

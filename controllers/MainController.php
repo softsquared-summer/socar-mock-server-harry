@@ -59,6 +59,18 @@ try {
                 return;
             }
 
+            $checkWithdrawal = checkWithdrawal($req->id);
+            $encodedRes= json_encode($checkWithdrawal);
+            $decodedRes= json_decode($encodedRes);
+
+            if($decodedRes->{'isDeleted'}!='N') {
+                $res->isSuccess = FALSE;
+                $res->code = 200;
+                $res->message = "이미 탈퇴된 회원입니다.";
+                echo json_encode($res, JSON_NUMERIC_CHECK);
+                return;
+            }
+
             //페이로드에 맞게 다시 설정 요함
             $jwt = getJWToken($req->id, $pullEncPw['encryptedPw'], JWT_SECRET_KEY);
             $res->result->jwt = $jwt;
