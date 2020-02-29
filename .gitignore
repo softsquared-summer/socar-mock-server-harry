@@ -112,5 +112,7 @@ images/
 
 /pdos/DatabasePdo.php
 /controllers/function.php
+/naverlogin.php
+/controllers/naver_callback.php
 
 >>>>>>> 4a57aa1134d67a04b55bfd38ac915dc56d0f3f2f
